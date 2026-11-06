@@ -8,7 +8,7 @@
 ## 입력 처리는 함수(toggle_pause, restart, ...)로 나눠 두어 테스트와 이후 터치 UI 가 같은 경로를 쓴다.
 extends Node2D
 
-@onready var course: TestCourse = $TestCourse
+@onready var course: CourseBase = _find_course()
 @onready var player: PlayerController = $Player
 @onready var camera: CourseCamera = $CourseCamera
 @onready var ui: GameUI = $GameUI
@@ -21,6 +21,8 @@ var game_over_reason := ""
 var finished := false
 ## 플레이 시간 (s) — 일시정지·게임 오버·클리어 뒤에는 멈춘다
 var elapsed := 0.0
+## 점수·콤보 (v0.2-2)
+var score: ScoreKeeper
 
 
 func _ready() -> void:
@@ -33,13 +35,17 @@ func _ready() -> void:
 	player.velocity = Vector2(player.movement.auto_forward_speed, 0.0)  # 시작부터 바로 전진 (§5.1)
 	player.died.connect(_on_player_died)
 	for hazard in course.get_hazards():
-		hazard.player_touched.connect(_on_hazard_touched)
+		watch_hazard(hazard)
 	start_x = player.global_position.x
 	max_x = start_x
 
 	camera.overview_rect = course.get_bounds()
 	camera.configure(player, player.movement, course.get_spawn_position().y)
 	_apply_debug_visible()
+	score = ScoreKeeper.new()
+	score.process_mode = Node.PROCESS_MODE_PAUSABLE  # 일시정지 중에는 콤보 시간도 멈춘다
+	add_child(score)
+	score.setup(player, load("res://resources/default_score.tres"))
 	WebSelfTest.attach_if_requested(self)  # 개발용: 웹 빌드를 ?selftest 로 열 때만 (tools/web_build.py --check)
 
 
@@ -49,9 +55,10 @@ func _physics_process(delta: float) -> void:
 	elapsed += delta
 	# 거리는 사망 판정 전에 갱신해야 게임 오버 표시와 디버그 값이 일치한다
 	max_x = maxf(max_x, player.global_position.x)
-	if player.global_position.y > course.fall_limit_y:
+	course.update_course(player.global_position.x)
+	if player.global_position.y > course.get_fall_limit_y():
 		player.die("fall")
-	elif player.global_position.x >= course.global_position.x + course.finish_x:
+	elif player.global_position.x >= course.get_finish_x():
 		_finish()
 
 
@@ -69,6 +76,9 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(_delta: float) -> void:
 	if debug_visible:
 		ui.set_debug_text(_debug_text())
+	var combo_ratio := score.combo_time_left / score.tuning.combo_window
+	ui.hud.show_values(get_score(), get_distance() / score.tuning.px_per_meter, score.combo,
+			score.multiplier_for(score.combo), score.last_bonus, combo_ratio)
 
 
 func toggle_pause() -> void:
@@ -90,8 +100,22 @@ func toggle_debug() -> void:
 
 
 func toggle_overview() -> void:
+	camera.overview_rect = course.get_bounds()  # 무한 코스는 지금 만들어진 구간
 	camera.set_overview(not camera.overview)
 	_apply_debug_visible()
+
+
+## 메인 씬의 코스 노드 (TestCourse 또는 EndlessCourse — 둘 다 CourseBase)
+func _find_course() -> CourseBase:
+	for child in get_children():
+		if child is CourseBase:
+			return child
+	return null
+
+
+## 총점 = 거리 점수 + 콤보 보너스 (§11)
+func get_score() -> int:
+	return score.total(get_distance())
 
 
 ## 이동 거리 점수 기준 — 최대 도달 X (뒤로 밀려도 줄지 않음)
@@ -105,6 +129,11 @@ func _finish() -> void:
 	ui.show_clear(elapsed, get_distance(), player.dash.kill_count)
 
 
+## 위험 구역 접촉을 사망으로 연결한다 (무한 코스가 풀을 늘릴 때도 부른다)
+func watch_hazard(hazard: Hazard) -> void:
+	hazard.player_touched.connect(_on_hazard_touched)
+
+
 func _on_hazard_touched(_hazard: Hazard) -> void:
 	player.die("hazard")
 
@@ -112,7 +141,7 @@ func _on_hazard_touched(_hazard: Hazard) -> void:
 func _on_player_died(reason: String) -> void:
 	game_over = true
 	game_over_reason = reason
-	ui.show_game_over(reason, get_distance())
+	ui.show_game_over(reason, get_distance(), get_score(), score.best_combo)
 
 
 func _apply_debug_visible() -> void:
@@ -134,8 +163,8 @@ func _debug_text() -> String:
 		"WIRE   %s" % player.grapple.describe(),
 		"AIM    %s" % ("attachable" if player.aim_preview.get("ok", false) else player.aim_preview.get("reason", "-")),
 		"DASH   %s" % player.dash.describe(),
-		"FALL   y > %.0f = game over" % course.fall_limit_y,
+		"FALL   y > %.0f = game over" % course.get_fall_limit_y(),
 		"CAM    y %.0f  (lowest %.0f)%s" % [camera.global_position.y, camera.get_lowest_y(),
 				"  overview" if camera.overview else ""],
 		"FPS    %d" % Engine.get_frames_per_second(),
-	])
+	] + ([] if course.describe().is_empty() else ["COURSE %s" % course.describe()]))

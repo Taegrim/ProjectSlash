@@ -4,7 +4,7 @@
 ## 좌표·크기는 [튜닝] 임시값이다. Phase 1~2 에서 통과 가능성(§10.3)을 확인하며 조정한다.
 @tool
 class_name TestCourse
-extends Node2D
+extends CourseBase
 
 const FALL_LINE_COLOR := Color(1.0, 0.3, 0.3, 0.8)
 const FINISH_COLOR := Color(0.45, 1.0, 0.55, 0.85)
@@ -23,6 +23,14 @@ const FINISH_COLOR := Color(0.45, 1.0, 0.55, 0.85)
 ## 판정선을 그릴 X 범위 (디버그 표시용)
 @export var draw_from_x := -400.0
 @export var draw_to_x := 4000.0
+
+
+func get_fall_limit_y() -> float:
+	return global_position.y + fall_limit_y
+
+
+func get_finish_x() -> float:
+	return global_position.x + finish_x
 
 
 func get_spawn_position() -> Vector2:

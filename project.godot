@@ -12,7 +12,7 @@ config_version=5
 
 config/name="ProjectSlash"
 config/description="2D 횡스크롤 무한 러너 액션 프로토타입 (MVP v0.1)"
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/endless.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [display]

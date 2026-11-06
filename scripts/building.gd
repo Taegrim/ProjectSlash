@@ -41,11 +41,23 @@ const LABEL_COLOR := Color(0.85, 0.88, 0.95)
 		queue_redraw()
 
 var _collider: CollisionShape2D
+var _layer := 2
+## 풀에서 다시 배치될 때마다 1 씩 늘어난다 — 같은 노드라도 다른 '건물'로 구분할 때 쓴다 (콤보: 건물마다 한 번)
+var serial := 0
+
+
+## 오브젝트 풀 (무한 코스): 끄면 숨기고 충돌에서 빠진다. 생성·삭제 없이 위치·크기만 바꿔 다시 쓴다
+func set_pooled(active: bool) -> void:
+	if active:
+		serial += 1
+	visible = active
+	collision_layer = _layer if active else 0
 
 
 func _ready() -> void:
 	if Engine.is_editor_hint():
 		return
+	_layer = collision_layer
 	_collider = CollisionShape2D.new()
 	_collider.shape = RectangleShape2D.new()
 	add_child(_collider)

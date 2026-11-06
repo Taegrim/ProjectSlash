@@ -33,6 +33,12 @@ func _ready() -> void:
 	body_entered.connect(_on_body_entered)
 
 
+## 오브젝트 풀 (무한 코스): 끄면 숨기고 감지를 멈춘다
+func set_pooled(active: bool) -> void:
+	visible = active
+	set_deferred("monitoring", active)
+
+
 func get_rect() -> Rect2:
 	return Rect2(global_position, size)
 

@@ -4,7 +4,7 @@
 ##   godot --path . --fixed-fps 60 -s res://tests/capture_screens.gd -- --out=<폴더> [옵션]
 ##
 ## 옵션
-##   --scene=res://...           캡처할 씬 (기본 메인 씬). 현재 씬으로 불러오므로 재시작(R)도 실제 경로로 동작한다
+##   --scene=res://...           캡처할 씬 (기본: 프로젝트 메인 씬 = 무한 코스. 고정 테스트 코스는 res://scenes/main.tscn). 현재 씬으로 불러오므로 재시작(R)도 실제 경로로 동작한다
 ##   --shots=이름@프레임,...      해당 프레임에 <out>/<이름>.png 저장 (기본 start@30)
 ##   --press=액션@프레임,...      해당 프레임에 입력 액션을 누른다 (예: restart@150, toggle_overview@200)
 ##   --record=시작-끝[:간격]      구간 프레임을 <out>/frames/f_0000.png … 로 저장 (GIF 재료, 간격 기본 2)
@@ -13,6 +13,7 @@
 ##                                dash (우클릭과 같음: 자동 타기팅 돌진)
 ##                                예) --call="aim:626,430@40;attach@53;release@83"
 ##   --overview                   마지막에 코스 전체 보기를 켜고 <out>/overview.png 저장
+##   --bot                        자동 조작 봇(tests/course_bot.gd)이 플레이 (무한 코스 녹화용, 코스는 환경 변수 COURSE_SEED 로 고정)
 extends SceneTree
 
 var _out := ""
@@ -23,10 +24,13 @@ func _initialize() -> void:
 
 
 func _run() -> void:
-	var options := {"out": "", "scene": "res://scenes/main.tscn", "shots": "start@30", "press": "", "record": "", "call": ""}
+	var options := {"out": "", "scene": str(ProjectSettings.get_setting("application/run/main_scene")), "shots": "start@30", "press": "", "record": "", "call": ""}
 	var overview := false
+	var use_bot := false
 	for arg in OS.get_cmdline_user_args():
-		if arg == "--overview":
+		if arg == "--bot":
+			use_bot = true
+		elif arg == "--overview":
 			overview = true
 		elif arg.begins_with("--") and "=" in arg:
 			var pair := arg.trim_prefix("--").split("=", true, 1)
@@ -56,6 +60,14 @@ func _run() -> void:
 	change_scene_to_file(options["scene"])
 	await process_frame
 	await process_frame
+	if use_bot:
+		var bot: Node = load("res://tests/course_bot.gd").new()
+		var course: Node = null
+		for child in current_scene.get_children():
+			if child is CourseBase:
+				course = child
+		bot.call("setup", current_scene.get_node("Player"), course)
+		current_scene.add_child(bot)
 
 	var last_frame := record_to
 	for frame_list in [shots.keys(), presses.keys(), calls.keys()]:

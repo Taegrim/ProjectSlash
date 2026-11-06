@@ -46,6 +46,17 @@ func kill() -> void:
 	killed.emit(self)
 
 
+## 오브젝트 풀 (무한 코스): 켜면 되살리고, 끄면 처치 신호 없이 숨기고 충돌을 끈다
+func set_pooled(active: bool) -> void:
+	if active:
+		revive()
+		return
+	alive = false
+	hide()
+	if _collider:
+		_collider.set_deferred("disabled", true)
+
+
 ## 되살린다 (실험실 씬의 처음으로 돌아가기용. 게임 재시작은 씬을 다시 불러온다)
 func revive() -> void:
 	alive = true
