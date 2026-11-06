@@ -5,7 +5,9 @@
 ## 재시작 (§4 R [MVP 제안], §13.2-16): 씬을 다시 불러와 위치·속도·와이어·돌진 타깃·적·점수를 모두 처음으로 되돌린다.
 ## 거리 점수는 '최대 도달 X' 기준 (§11 [MVP 제안]) — v0.1 은 표시만.
 ## 코스 클리어 (Phase 4): 살아서 결승선을 넘으면 세계를 멈추고 시간·거리·처치 수를 보여 준다. R 로 바로 다시 시작.
-## 입력 처리는 함수(toggle_pause, restart, ...)로 나눠 두어 테스트와 이후 터치 UI 가 같은 경로를 쓴다.
+## 입력 처리는 함수(toggle_pause, restart, ...)로 나눠 두어 테스트와 터치 UI 가 같은 경로를 쓴다.
+## 터치·화면 (v0.2-6): 모바일이거나 터치가 들어오면 터치 모드(일시정지 버튼·탭 재시작·조준 고리 숨김), 실제 마우스를 움직이면 해제.
+## 화면이 세로가 되면 '가로로 돌려 주세요' 덮개를 띄우고 자동으로 멈췄다가 가로가 되면 다시 움직인다. F11 = 전체 화면 (데스크톱).
 extends Node2D
 
 @onready var course: CourseBase = _find_course()
@@ -26,6 +28,16 @@ var score: ScoreKeeper
 ## 시각 효과·효과음 (v0.2-3)
 var fx: FX
 var sfx: SFX
+## 터치 모드 (v0.2-6)
+var touch_mode := false
+## 게임 오버·클리어 뒤 탭으로 재시작하기까지 기다리는 시간 (ms) — 플레이 중 누르던 손가락에 바로 재시작되지 않게
+var restart_tap_delay_ms := 500
+## 마지막 터치 뒤 이 시간 안의 마우스 움직임은 터치 모드를 끄지 않는다 (ms)
+var touch_mouse_grace_ms := 1000
+## 세로 화면 때문에 자동으로 멈췄는지 (가로가 되면 이것만 풀어 준다)
+var paused_by_orientation := false
+var _ended_at_ms := 0
+var _last_touch_ms := -1000000
 
 
 func _ready() -> void:
@@ -59,6 +71,11 @@ func _ready() -> void:
 	sfx.setup(player, score)
 	ui.set_air_control(player.get_air_control_mode())
 	ui.set_input_scheme(player.is_one_button())
+	ui.pause_pressed.connect(toggle_pause)
+	ui.restart_pressed.connect(restart)
+	set_touch_mode(OS.has_feature("mobile") or OS.has_feature("web_android") or OS.has_feature("web_ios"))
+	get_viewport().size_changed.connect(_check_orientation)
+	_check_orientation()
 	WebSelfTest.attach_if_requested(self)  # 개발용: 웹 빌드를 ?selftest 로 열 때만 (tools/web_build.py --check)
 
 
@@ -77,8 +94,20 @@ func _physics_process(delta: float) -> void:
 		_finish()
 
 
+## 입력 장치 감지 (GUI 버튼이 먹는 입력도 보도록 _input 에서)
+func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch or event is InputEventScreenDrag:
+		_last_touch_ms = Time.get_ticks_msec()
+		if not touch_mode:
+			set_touch_mode(true)
+	elif touch_mode and event is InputEventMouseMotion and event.device != InputEvent.DEVICE_ID_EMULATION 			and Time.get_ticks_msec() - _last_touch_ms >= touch_mouse_grace_ms:
+		set_touch_mode(false)
+
+
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("pause"):
+	if (game_over or finished) and event is InputEventScreenTouch and event.pressed 			and Time.get_ticks_msec() - _ended_at_ms >= restart_tap_delay_ms:
+		restart()  # 터치: 게임 오버·클리어 화면을 탭하면 재시작
+	elif event.is_action_pressed("pause"):
 		toggle_pause()
 	elif event.is_action_pressed("restart"):
 		restart()
@@ -90,6 +119,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		toggle_air_control()
 	elif event.is_action_pressed("toggle_input_scheme"):
 		toggle_input_scheme()
+	elif event.is_action_pressed("toggle_fullscreen"):
+		toggle_fullscreen()
 
 
 func _process(_delta: float) -> void:
@@ -103,6 +134,7 @@ func _process(_delta: float) -> void:
 func toggle_pause() -> void:
 	if game_over or finished:
 		return
+	paused_by_orientation = false
 	get_tree().paused = not get_tree().paused
 	ui.set_paused(get_tree().paused)
 
@@ -126,6 +158,42 @@ func toggle_input_scheme() -> void:
 	var one := not player.is_one_button()
 	PlayerController.one_button_override = 1 if one else 0
 	ui.set_input_scheme(one)
+
+
+## 터치 모드 켜기/끄기. 켤 때는 디버그 표시를 숨긴다 (휴대폰에는 F1 이 없고 화면을 가림)
+func set_touch_mode(enabled: bool) -> void:
+	touch_mode = enabled
+	player.touch_mode = enabled
+	player.queue_redraw()
+	ui.set_touch_mode(enabled)
+	if enabled and debug_visible:
+		debug_visible = false
+		_apply_debug_visible()
+
+
+## 화면이 세로인지 확인 (창 크기가 바뀔 때마다)
+func _check_orientation() -> void:
+	var size := get_viewport().get_visible_rect().size
+	apply_orientation(size.x < size.y)
+
+
+## 세로면 덮개 + 자동 일시정지, 가로로 돌아오면 자동으로 멈춘 경우에만 다시 움직인다
+func apply_orientation(portrait: bool) -> void:
+	ui.set_rotate_overlay(portrait)
+	if portrait and not get_tree().paused and not game_over and not finished:
+		get_tree().paused = true
+		paused_by_orientation = true
+	elif not portrait and paused_by_orientation:
+		get_tree().paused = false
+		paused_by_orientation = false
+
+
+## 전체 화면 전환 (F11, 데스크톱). 웹은 브라우저의 전체 화면(F11)을 쓴다
+func toggle_fullscreen() -> void:
+	if OS.has_feature("web"):
+		return
+	var fullscreen := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if fullscreen else DisplayServer.WINDOW_MODE_FULLSCREEN)
 
 
 func toggle_debug() -> void:
@@ -159,6 +227,7 @@ func get_distance() -> float:
 
 func _finish() -> void:
 	finished = true
+	_ended_at_ms = Time.get_ticks_msec()
 	get_tree().paused = true  # 세계를 멈춘다 (Main 은 계속 입력을 받아 R 로 재시작)
 	ui.show_clear(elapsed, get_distance(), player.dash.kill_count)
 
@@ -175,6 +244,7 @@ func _on_hazard_touched(_hazard: Hazard) -> void:
 func _on_player_died(reason: String) -> void:
 	game_over = true
 	game_over_reason = reason
+	_ended_at_ms = Time.get_ticks_msec()
 	ui.show_game_over(reason, get_distance(), get_score(), score.best_combo)
 
 

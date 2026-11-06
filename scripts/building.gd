@@ -9,6 +9,8 @@
 class_name Building
 extends StaticBody2D
 
+const GROUP := "buildings"
+
 const BODY_COLOR := Color(0.22, 0.25, 0.33)
 const OUTLINE_COLOR := Color(0.47, 0.52, 0.64)
 const ATTACH_COLOR := Color(0.96, 0.79, 0.3, 0.55)
@@ -57,6 +59,7 @@ func set_pooled(active: bool) -> void:
 func _ready() -> void:
 	if Engine.is_editor_hint():
 		return
+	add_to_group(GROUP)  # 자동 조준(GrappleController.find_auto_anchor)이 찾는다
 	_layer = collision_layer
 	_collider = CollisionShape2D.new()
 	_collider.shape = RectangleShape2D.new()

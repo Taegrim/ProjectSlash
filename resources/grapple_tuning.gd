@@ -53,3 +53,15 @@ enum RopeLengthPolicy {
 ## 해제 후 위쪽 속도 상한 (px/s). 도약 보너스를 더해도, 진자가 위로 솟는 중에 놓아도 이보다 빠르게 솟지 않는다 (§6.4)
 ## — MaxReleaseVerticalSpeed. Phase 2 에서 650 → 450 (650 이면 A 에서 지붕보다 360px 위까지 솟아 B 까지 공짜로 넘는 수준)
 @export var max_release_vertical_speed: float = 450.0
+
+@export_group("터치")
+## 터치로 누를 때 손가락이 연결 띠를 이만큼(화면 px) 벗어나도 띠로 본다 (v0.2-6 [튜닝]). 마우스에는 쓰지 않는다. 0 = 정확히 띠 위만
+@export var touch_snap_radius: float = 48.0
+
+@export_group("자동 조준 (모바일)")
+## 모바일 '아무 곳이나 누르기'(v0.2-7)가 노리는 앞쪽 범위 (px). 자동 조작 봇과 같은 값
+@export var auto_aim_look: float = 650.0
+## 실제 연결점까지 이 거리 안일 때만 자동으로 건다 (px) — 사거리(grapple_max_range)보다 짧게 잡아 긴 로프로 깊게 처지지 않게
+@export var auto_aim_reach: float = 450.0
+## 공중 구조물(반시계로 아래를 지나감)은 더 짧게 (px)
+@export var auto_aim_reach_aerial: float = 380.0

@@ -1,7 +1,7 @@
 """ProjectSlash 하네스 공용 모듈 — Godot 실행 파일 탐색과 헤드리스 실행.
 
 Godot 실행 파일 탐색 순서
-  1) 환경 변수 GODOT_BIN
+  1) 환경 변수 GODOT_BIN, 없으면 .claude/settings.local.json 의 "env" 에 적힌 GODOT_BIN (사용자 터미널에서 직접 실행할 때)
      머신마다 경로가 다르므로 .claude/settings.local.json 의 "env" 에 두고 커밋하지 않는다.
      Windows 에서는 콘솔 출력을 받을 수 있도록 *_console.exe 를 지정한다.
   2) PATH 의 godot / godot4
@@ -43,8 +43,18 @@ def use_utf8_stdio() -> None:
             pass
 
 
+def _settings_godot_bin() -> str:
+    """.claude/settings.local.json 의 env.GODOT_BIN — Claude Code 세션 밖(사용자 터미널)에서 실행해도 같은 경로를 쓰게"""
+    settings = Path(__file__).resolve().parents[1] / ".claude" / "settings.local.json"
+    try:
+        import json
+        return str(json.loads(settings.read_text(encoding="utf-8")).get("env", {}).get("GODOT_BIN", "")).strip()
+    except (OSError, ValueError):
+        return ""
+
+
 def find_godot() -> str | None:
-    env = os.environ.get("GODOT_BIN", "").strip().strip('"')
+    env = (os.environ.get("GODOT_BIN", "") or _settings_godot_bin()).strip().strip('"')
     if env:
         return env if Path(env).is_file() else None
     for name in ("godot", "godot4"):

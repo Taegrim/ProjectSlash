@@ -59,6 +59,18 @@ var debug_air_input := NAN
 static var one_button_override := -1
 ## 지금 돌진하면 벨 대상 {enemy, reason} (표시용)
 var dash_preview := {}
+## 터치 모드 (v0.2-6, GameFlow 가 정한다): 누르기 전 조준 위치가 없으므로 조준 고리를 그리지 않는다
+var touch_mode := false
+## 모바일 자동 조준 (v0.2-7 사용자 결정: 플래피버드식 '아무 곳이나 누르기'). 터치 누름 = 돌진할 적이 있으면 돌진,
+## 없으면 자동으로 고른 띠에 와이어 (GrappleController.find_auto_anchor). false = 누른 위치 조준 + 띠 맞춤 (v0.2-6 방식)
+@export var touch_auto_aim := true
+## 지금 터치하면 걸릴 자동 조준 결과 (표시용, 터치 모드에서만)
+var auto_preview := {}
+## 마지막 누름이 한 일 "wire" | "dash" | "none" (디버그·테스트용)
+var last_press := ""
+## 방금 와이어를 건 건물 — 자동 조준은 다음 건물로 넘어간다 (풀에서 다시 쓰인 건물과 구분하려고 serial 도 기억)
+var _last_wire_building: Building
+var _last_wire_serial := -1
 ## 캡처·테스트용: 유한한 값이면 마우스 대신 이 지점을 조준점으로 쓴다
 var debug_aim_override := Vector2.INF
 
@@ -76,6 +88,9 @@ var _extra_deceleration := 900.0
 func _ready() -> void:
 	grapple.setup(self, grapple_tuning)
 	dash.setup(self, dash_tuning)
+	grapple.attached.connect(func(_anchor: Vector2, building: Building) -> void:
+		_last_wire_building = building
+		_last_wire_serial = building.serial if building else -1)
 
 
 func _physics_process(delta: float) -> void:
@@ -85,6 +100,7 @@ func _physics_process(delta: float) -> void:
 	if get_air_control_mode() == MovementTuning.AirControlMode.FINE:
 		air_input = debug_air_input if not is_nan(debug_air_input) else Input.get_axis("move_left", "move_right")
 	dash_preview = dash.find_target() if state in [State.AIRBORNE, State.GRAPPLING] else {}
+	auto_preview = find_auto_anchor() if touch_mode and touch_auto_aim and state == State.AIRBORNE 			and dash_preview.get("enemy") == null else {}
 	match state:
 		State.AIRBORNE:
 			_step_airborne(delta)
@@ -110,7 +126,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if state == State.DEAD:
 		return
 	if event.is_action_pressed("grapple"):
-		press_action(aim_point if debug_aim_override.is_finite() else get_global_mouse_position())
+		press_action(_pointer_world(event), is_touch_event(event))
 	elif event.is_action_released("grapple"):
 		grapple.request_release()
 	elif event.is_action_pressed("dash"):
@@ -119,13 +135,54 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## 좌클릭(주 버튼) 누름. 한 버튼 방식(v0.2-5)이면 조준이 건물 연결 띠 위일 때만 와이어, 아니면 돌진(자동 타기팅).
 ## 두 버튼 방식이면 언제나 와이어 (돌진은 우클릭). 우클릭 돌진은 두 방식 모두 그대로 쓸 수 있다.
+## from_touch 면 손가락 오차를 감안해 근처 띠로 맞춘다 (GrappleTuning.touch_snap_radius, v0.2-6).
 ## 반환: "wire" | "dash" (요청 결과는 각 컨트롤러의 last_request 에 남는다)
-func press_action(at: Vector2) -> String:
+func press_action(at: Vector2, from_touch := false) -> String:
+	if from_touch and touch_auto_aim:
+		last_press = _press_auto()
+		return last_press
+	if from_touch:
+		at = grapple.snap_aim(at, grapple_tuning.touch_snap_radius / get_canvas_transform().get_scale().x)
 	if is_one_button() and not grapple.evaluate(at).get("ok", false):
 		dash.request_dash()
+		last_press = "dash"
 		return "dash"
 	grapple.request_attach(at)
+	last_press = "wire"
 	return "wire"
+
+
+## 터치 화면에서 온 누름인지 — Godot 는 터치를 마우스 왼쪽 버튼으로 바꿔 보내며 장치 번호를 DEVICE_ID_EMULATION 으로 둔다
+static func is_touch_event(event: InputEvent) -> bool:
+	return event is InputEventScreenTouch or event.device == InputEvent.DEVICE_ID_EMULATION
+
+
+## 누른 지점의 전역 좌표: 이벤트에 실린 화면 좌표를 카메라 기준으로 되돌린다 (터치는 누르기 전 마우스 위치가 없으므로).
+## 캡처·테스트용 debug_aim_override 가 있으면 그것을 쓴다
+func _pointer_world(event: InputEvent) -> Vector2:
+	if debug_aim_override.is_finite():
+		return debug_aim_override
+	if event is InputEventMouseButton or event is InputEventScreenTouch:
+		return get_canvas_transform().affine_inverse() * event.position
+	return get_global_mouse_position()
+
+
+## 모바일 자동 조준 누름: 돌진할 적이 있으면 돌진(적 우선), 없으면 자동으로 고른 띠에 와이어, 둘 다 없으면 아무 일 없음
+func _press_auto() -> String:
+	if dash.find_target().enemy != null:
+		dash.request_dash()
+		return "dash"
+	var found := find_auto_anchor()
+	if not found.ok:
+		grapple.last_request = "auto aim: nothing to hook"
+		return "none"
+	grapple.request_attach(found.aim)
+	return "wire"
+
+
+## 지금 자동 조준이면 걸릴 곳 (방금 건 건물은 건너뜀)
+func find_auto_anchor() -> Dictionary:
+	return grapple.find_auto_anchor(_last_wire_building, _last_wire_serial)
 
 
 ## 지금 한 버튼 방식인지 (게임 중 F3 로 바꾼 값이 우선)
@@ -242,12 +299,17 @@ func _draw() -> void:
 		return
 	# 조준 표시: 연결 가능한 곳을 가리키면 초록, 아니면 빨강 (§6.2 마우스가 유효 영역을 가리킬 때만 연결)
 	var aim := to_local(aim_point)
-	if state == State.AIRBORNE:
+	if state == State.AIRBORNE and not touch_mode:
 		var valid: bool = aim_preview.get("ok", false)
 		var aim_color := Color(0.4, 1.0, 0.5, 0.9) if valid else Color(1.0, 0.4, 0.4, 0.7)
 		draw_arc(aim, 8.0, 0.0, TAU, 18, aim_color, 2.0)
 		if valid:
 			draw_circle(to_local(aim_preview.point), 4.0, aim_color)  # 실제로 걸릴 지점
+	# 자동 조준 미리보기 (모바일): 지금 화면을 누르면 와이어가 걸릴 곳
+	if auto_preview.get("ok", false):
+		var mark := to_local(auto_preview.point)
+		draw_arc(mark, 13.0, 0.0, TAU, 24, Color(0.4, 1.0, 0.5, 0.95), 3.0)
+		draw_circle(mark, 5.0, Color(0.4, 1.0, 0.5, 0.95))
 	# 돌진 타깃 미리보기: 지금 돌진하면 벨 적 (§7.2 자동 선택 결과를 보여 준다)
 	var target: Enemy = dash_preview.get("enemy")
 	if target != null:

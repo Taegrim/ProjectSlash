@@ -76,7 +76,7 @@ Claude가 작업 결과를 스스로 확인하기 위한 장치다. 세부 사�
 | `python tools/validate.py` | 임포트(class_name 캐시 갱신) → 모든 `.gd/.tscn/.tres` 로드 검사 → `tests/test_*.gd` 실행. `--smoke [프레임]`으로 메인 씬 헤드리스 실행 추가, `--filter`로 일부 테스트만 |
 | `tests/run_tests.gd`, `tests/test_case.gd` | 플러그인 없는 헤드리스 테스트 러너/기본 클래스. 물리·상태 전환 회귀 테스트는 `tests/test_*.gd`로 추가 |
 | `tests/capture_screens.gd` | 창을 잠깐 띄워 스크린샷·GIF용 연속 프레임 저장 (리뷰 페이지용). 프레임별 입력(`--press`)·와이어 조작(`--call`) 지정 가능: `python tools/godot_cli.py --path . --fixed-fps 60 -s res://tests/capture_screens.gd -- --out=<폴더>` (옵션은 파일 머리말) |
-| `python tools/web_build.py` | Web 내보내기(`build/web`, pck 에 tests/tools/docs 없는지 확인). `--serve` 로컬 서버+브라우저, `--check` 헤드리스 Edge 로 `?selftest` 를 열어 게임이 직접 보낸 화면·상태로 실행 확인(`scripts/web_selftest.gd`) |
+| `python tools/web_build.py` | Web 내보내기(`build/web`, pck 에 tests/tools/docs 없는지 확인). `--serve` 로컬 서버+브라우저, `--check` 헤드리스 Edge 로 `?selftest` 를 열어 게임이 직접 보낸 화면·상태로 실행 확인(`scripts/web_selftest.gd`). `--check --mobile` 휴대폰 가로 화면·터치로 확인, `--serve --lan` 같은 와이파이 휴대폰용 주소 출력(개발 중에만), `--publish` GitHub Pages(gh-pages 브랜치) 게시 → https://taegrim.github.io/ProjectSlash/ (외부 공개이므로 사용자가 요청할 때만) |
 | `.claude/hooks/godot_check.py` | (자동) `.gd/.tscn/.tres` 수정 직후 해당 파일 파스/로드 검사, 오류 시 즉시 피드백 |
 | `.claude/hooks/guard_confirmed_rules.py` | (자동) 기획서의 `[확정]` 줄·15절 수정/삭제와 새 `[확정]` 추가를 차단 |
 

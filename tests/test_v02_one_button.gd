@@ -134,7 +134,7 @@ func _click(player: PlayerController, aim: Vector2, pressed: bool, button := MOU
 	var event := InputEventMouseButton.new()
 	event.button_index = button
 	event.pressed = pressed
-	event.device = -1
+	event.device = 0  # 실제 마우스 (−1 = 터치에서 바꾼 마우스 → 띠 맞춤이 켜짐)
 	player._unhandled_input(event)
 
 

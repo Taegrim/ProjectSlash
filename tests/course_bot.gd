@@ -8,11 +8,7 @@ extends Node
 ## 놓기 전에 최소한 잡고 있는 프레임 (해제 도약 조건 0.25초 = 15 프레임)
 const MIN_HOLD := 16
 const MAX_HOLD := 100
-## 앞쪽 몇 px 안의 건물까지 노리는가
-const LOOK := 650.0
-## 실제 연결점까지 이 거리 안일 때만 건다. 공중 구조물은 반시계로 아래를 지나므로 긴 로프면 원이 깊게 내려가 위험하다
-const MAX_REACH := 450.0
-const MAX_REACH_AERIAL := 380.0
+## 노리는 범위·연결 거리는 GrappleTuning 의 자동 조준 값 (auto_aim_look / auto_aim_reach / auto_aim_reach_aerial)
 
 var player: PlayerController
 var course: CourseBase
@@ -86,25 +82,7 @@ func _try_attach() -> void:
 		actions += 1
 
 
+## 게임의 자동 조준(모바일 '아무 곳이나 누르기')과 같은 규칙 — GrappleController.find_auto_anchor
 func _best_anchor() -> Array:
-	var best: Building = null
-	var best_aim := Vector2.ZERO
-	for building in course.get_buildings():
-		if building == _last_building:
-			continue
-		var rect := building.get_rect()
-		if rect.end.x < player.global_position.x + 20.0 or rect.position.x - player.global_position.x > LOOK:
-			continue
-		var aim := Vector2(rect.get_center().x, rect.end.y) if building.aerial \
-				else Vector2(rect.position.x + 4.0, building.get_attach_rect().position.y + 12.0)
-		var probe := player.grapple.evaluate(aim)
-		if not probe.ok:
-			continue
-		var reach := MAX_REACH_AERIAL if building.aerial else MAX_REACH
-		var point: Vector2 = probe.point
-		if point.distance_to(player.global_position) > reach or point.x < player.global_position.x + 40.0:
-			continue  # 너무 멀거나, 이미 지나쳐 뒤·아래에 있는 모서리 (사람도 걸지 않는다)
-		if best == null or rect.position.x < best.get_rect().position.x:
-			best = building
-			best_aim = aim
-	return [best, best_aim]
+	var found := player.grapple.find_auto_anchor(_last_building)
+	return [found.building, found.aim]

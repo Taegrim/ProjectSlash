@@ -84,6 +84,16 @@ func apply_layout(next: Layout) -> void:
 			_box.offset_top = -44.0
 
 
+## 글자·막대 크기 배율 (모바일 터치 모드는 크게, v0.2-7 사용자 결정 "모바일은 UI 만 크게")
+func set_ui_scale(k: float) -> void:
+	for pair in [[_score_label, 30], [_dist_label, 18], [_combo_label, 26]]:
+		var label: Label = pair[0]
+		label.add_theme_font_size_override("font_size", roundi(pair[1] * k))
+		label.add_theme_constant_override("outline_size", roundi(6 * k))
+	_combo_bar.custom_minimum_size = Vector2(170, 6) * k
+	apply_layout(layout)  # 커진 크기에 맞춰 위치를 다시 잡는다
+
+
 ## 매 프레임 값 갱신. combo_ratio = 콤보가 끊기기까지 남은 시간 비율 (0~1)
 func show_values(score: int, meters: float, combo: int, multiplier: float, bonus: int, combo_ratio: float) -> void:
 	_score_label.text = "SCORE  %s" % _group_digits(score)

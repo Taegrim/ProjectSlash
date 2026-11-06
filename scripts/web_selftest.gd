@@ -35,6 +35,8 @@ func _physics_process(_delta: float) -> void:
 		"player_x": player.global_position.x,
 		"state": player.get_state_name(),
 		"renderer": RenderingServer.get_current_rendering_method(),
+		"touch_mode": _main.get("touch_mode"),
+		"viewport": "%dx%d" % [get_viewport().get_visible_rect().size.x, get_viewport().get_visible_rect().size.y],
 		"png": Marshalls.raw_to_base64(image.save_png_to_buffer()),
 	}
 	JavaScriptBridge.eval("fetch('/__selftest', {method: 'POST', body: %s})" % JSON.stringify(JSON.stringify(report)), true)

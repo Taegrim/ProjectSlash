@@ -77,6 +77,7 @@ var _bumps_before := 0
 var _blocked_time := 0.0
 var _overstretch_time := 0.0
 var _rope_line: Line2D
+var _snap_shape := CircleShape2D.new()
 
 
 func setup(owner_player: PlayerController, grapple_tuning: GrappleTuning) -> void:
@@ -122,6 +123,61 @@ func evaluate(aim_point: Vector2) -> Dictionary:
 	result.ok = true
 	result.building = target
 	return result
+
+
+## 터치용 (v0.2-6): 누른 지점이 연결 가능하지 않으면, radius(전역 px) 안에 있는 연결 띠 중 가장 가까운 연결 가능 지점으로 맞춘다.
+## 맞출 곳이 없으면 aim 그대로 돌려준다 (그러면 한 버튼은 돌진으로 처리). 손가락이 마우스보다 덜 정확해서 둔다.
+func snap_aim(aim: Vector2, radius: float) -> Vector2:
+	if radius <= 0.0 or evaluate(aim).ok:
+		return aim
+	_snap_shape.radius = radius
+	var params := PhysicsShapeQueryParameters2D.new()
+	params.shape = _snap_shape
+	params.transform = Transform2D(0.0, aim)
+	params.collision_mask = RAY_MASK
+	params.exclude = [player.get_rid()]
+	var best := aim
+	var best_distance := INF
+	for hit in player.get_world_2d().direct_space_state.intersect_shape(params, 16):
+		var building := hit.collider as Building
+		if building == null:
+			continue
+		var band := building.get_attach_rect().grow(-1.0)
+		var candidate := Vector2(clampf(aim.x, band.position.x, band.end.x), clampf(aim.y, band.position.y, band.end.y))
+		var distance := candidate.distance_to(aim)
+		if distance <= radius and distance < best_distance and evaluate(candidate).ok:
+			best = candidate
+			best_distance = distance
+	return best
+
+
+## 자동 조준 (모바일 '아무 곳이나 누르기', v0.2-7): 앞쪽 auto_aim_look 안의 건물 중 연결 가능한 가장 앞의 건물 띠.
+## 솟은 건물은 띠 왼쪽 위 모서리 근처, 공중 구조물은 밑면 가운데를 노린다. 연결점이 너무 멀거나 이미 지나친 곳이면 건너뛴다.
+## exclude = 방금 놓은 건물 (다음 건물로 넘어가게, exclude_serial 이 같을 때만 — 풀에서 다시 쓰인 건물은 제외하지 않음).
+## 자동 조작 봇(tests/course_bot.gd)도 이 함수를 쓴다 → 봇의 무한 코스 생존 기록이 이 규칙의 근거.
+## 반환 {ok, aim(request_attach 에 넘길 지점), point(실제 연결점), building}
+func find_auto_anchor(exclude: Building = null, exclude_serial := -1) -> Dictionary:
+	var best := {"ok": false, "aim": Vector2.ZERO, "point": Vector2.ZERO, "building": null}
+	var origin := player.global_position
+	var best_left := INF
+	for node in player.get_tree().get_nodes_in_group(Building.GROUP):
+		var building := node as Building
+		if building == null or (building == exclude and (exclude_serial < 0 or building.serial == exclude_serial)):
+			continue
+		var rect := building.get_rect()
+		if rect.end.x < origin.x + 20.0 or rect.position.x - origin.x > tuning.auto_aim_look or rect.position.x >= best_left:
+			continue
+		var aim := Vector2(rect.get_center().x, rect.end.y) if building.aerial 				else Vector2(rect.position.x + 4.0, building.get_attach_rect().position.y + 12.0)
+		var probe := evaluate(aim)
+		if not probe.ok or probe.building != building:
+			continue  # 연결 불가, 또는 가는 길에 다른 건물이 먼저 걸림 (표시한 곳과 실제로 걸리는 곳이 달라지지 않게)
+		var reach := tuning.auto_aim_reach_aerial if building.aerial else tuning.auto_aim_reach
+		var point: Vector2 = probe.point
+		if point.distance_to(origin) > reach or point.x < origin.x + 40.0:
+			continue  # 너무 멀거나, 이미 지나쳐 뒤·아래에 있는 모서리
+		best = {"ok": true, "aim": aim, "point": point, "building": building}
+		best_left = rect.position.x
+	return best
 
 
 ## 좌클릭을 누른 순간 1회 연결을 시도한다 (§4 [MVP 제안]: 실패해도 누르고 있는 동안 자동 재발사하지 않음).

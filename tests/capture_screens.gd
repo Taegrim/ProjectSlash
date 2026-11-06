@@ -11,6 +11,7 @@
 ##   --call=명령@프레임;...       플레이어 와이어 조작 (구분자는 ';'):
 ##                                aim:x,y (조준점 고정 — 마우스 대신), attach (조준점으로 연결), release (해제),
 ##                                click / unclick (좌클릭 누름·놓기 — 한 버튼 방식 그대로),
+##                                touchmode (터치 모드 UI 로 전환), tap (터치 누름 = 자동 조준, 놓기는 unclick),
 ##                                dash (우클릭과 같음: 자동 타기팅 돌진)
 ##                                예) --call="aim:626,430@40;attach@53;release@83"
 ##   --overview                   마지막에 코스 전체 보기를 켜고 <out>/overview.png 저장
@@ -126,8 +127,13 @@ func _call_player(command: String) -> void:
 		player.get("grapple").call("request_release")
 	elif command == "dash":
 		player.get("dash").call("request_dash")
+	elif command == "touchmode":  # 터치 모드 UI 로 바꾼다 (모바일 화면 캡처용)
+		current_scene.call("set_touch_mode", true)
+		return
 	elif command == "click":  # 좌클릭 누름 = 실제 입력 경로 (한 버튼이면 띠 조준 → 와이어, 아니면 돌진)
 		print("click -> %s" % player.call("press_action", player.get("debug_aim_override")))
+	elif command == "tap":  # 화면 터치 누름 = 모바일 자동 조준 (어디를 눌러도 같음)
+		print("tap -> %s" % player.call("press_action", Vector2(player.get("global_position")), true))
 	elif command == "unclick":  # 좌클릭 놓기 = 와이어 해제
 		player.get("grapple").call("request_release")
 	else:
