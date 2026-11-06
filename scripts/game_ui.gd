@@ -1,0 +1,36 @@
+## 게임 UI — 디버그 표시(기획서 §13.1), 일시정지·게임 오버 표시, 조작 안내.
+## 게임 안 글자는 영어로 둔다: 웹 빌드의 기본 폰트에 한글 글리프가 없어 깨지는 것을 피하고 폰트 에셋을 늘리지 않기 위해서.
+class_name GameUI
+extends CanvasLayer
+
+const DEATH_TEXT := {
+	"fall": "fell below the limit",
+	"hazard": "hit a hazard",
+}
+
+@onready var _debug_panel: Control = $DebugPanel
+@onready var _debug_label: Label = $DebugPanel/DebugLabel
+@onready var _pause_label: Label = $PauseLabel
+@onready var _game_over_label: Label = $GameOverLabel
+
+
+func set_debug_visible(enabled: bool) -> void:
+	_debug_panel.visible = enabled
+
+
+func set_debug_text(text: String) -> void:
+	_debug_label.text = text
+
+
+func set_paused(paused: bool) -> void:
+	_pause_label.visible = paused
+
+
+func show_game_over(reason: String, distance: float) -> void:
+	# 디버그 표시와 같은 반올림(%.0f)을 써서 두 값이 어긋나지 않게 한다
+	_game_over_label.text = "GAME OVER  -  %s\ndistance  %.0f px\n\nR  restart" % [DEATH_TEXT.get(reason, reason), distance]
+	_game_over_label.visible = true
+
+
+func is_game_over_visible() -> bool:
+	return _game_over_label.visible

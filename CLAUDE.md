@@ -75,6 +75,7 @@ Claude가 작업 결과를 스스로 확인하기 위한 장치다. 세부 사�
 |---|---|
 | `python tools/validate.py` | 임포트(class_name 캐시 갱신) → 모든 `.gd/.tscn/.tres` 로드 검사 → `tests/test_*.gd` 실행. `--smoke [프레임]`으로 메인 씬 헤드리스 실행 추가, `--filter`로 일부 테스트만 |
 | `tests/run_tests.gd`, `tests/test_case.gd` | 플러그인 없는 헤드리스 테스트 러너/기본 클래스. 물리·상태 전환 회귀 테스트는 `tests/test_*.gd`로 추가 |
+| `tests/capture_screens.gd` | 창을 잠깐 띄워 시작 화면·코스 전체 보기 스크린샷 저장 (리뷰 페이지용): `python tools/godot_cli.py --path . -s res://tests/capture_screens.gd -- --out=<폴더>` |
 | `.claude/hooks/godot_check.py` | (자동) `.gd/.tscn/.tres` 수정 직후 해당 파일 파스/로드 검사, 오류 시 즉시 피드백 |
 | `.claude/hooks/guard_confirmed_rules.py` | (자동) 기획서의 `[확정]` 줄·15절 수정/삭제와 새 `[확정]` 추가를 차단 |
 

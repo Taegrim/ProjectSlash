@@ -26,6 +26,12 @@ export_credentials.cfg
 .claude/worktrees/
 CLAUDE.local.md
 
+# --- 로컬 AI 도구 설정 (Revvy 가 생성, 이 PC 전용 주소 포함 — 커밋하지 않음) ---
+.mcp.json
+.kimi-code/
+.revvy/
+AGENTS.md
+
 # --- 리뷰 페이지 등 로컬 산출물 (review-gallery). .gdignore 만 커밋해 Godot 임포트 방지 ---
 /output/*
 !/output/.gdignore

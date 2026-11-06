@@ -1,0 +1,43 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/test_course.gd" id="1_course"]
+[ext_resource type="PackedScene" path="res://scenes/building.tscn" id="2_building"]
+[ext_resource type="PackedScene" path="res://scenes/enemy.tscn" id="3_enemy"]
+[ext_resource type="PackedScene" path="res://scenes/hazard.tscn" id="4_hazard"]
+
+[node name="TestCourse" type="Node2D"]
+script = ExtResource("1_course")
+
+[node name="PlayerSpawn" type="Marker2D" parent="."]
+position = Vector2(200, 280)
+
+[node name="BuildingA" parent="." instance=ExtResource("2_building")]
+position = Vector2(620, 420)
+size = Vector2(220, 680)
+attach_band_depth = 70.0
+debug_label = "A  tutorial"
+
+[node name="BuildingB" parent="." instance=ExtResource("2_building")]
+position = Vector2(1180, 180)
+size = Vector2(240, 920)
+attach_band_depth = 170.0
+debug_label = "B  tall (low attach)"
+
+[node name="EnemyC" parent="." instance=ExtResource("3_enemy")]
+position = Vector2(1800, 330)
+debug_label = "C"
+
+[node name="EnemyD" parent="." instance=ExtResource("3_enemy")]
+position = Vector2(2200, 260)
+debug_label = "D"
+
+[node name="BuildingE" parent="." instance=ExtResource("2_building")]
+position = Vector2(2700, 380)
+size = Vector2(260, 720)
+attach_band_depth = 80.0
+debug_label = "E  reconnect"
+
+[node name="HazardZone" parent="." instance=ExtResource("4_hazard")]
+position = Vector2(3250, 560)
+size = Vector2(180, 540)
+debug_label = "HAZARD"
