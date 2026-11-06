@@ -1,0 +1,29 @@
+# Godot 4 기본 .editorconfig(root + utf-8)를 확장한 설정
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# GDScript: Godot 스타일 가이드 기본값인 탭 들여쓰기
+[*.gd]
+indent_style = tab
+indent_size = 4
+
+# Godot가 직접 쓰는 텍스트 리소스: 에디터 출력 형식을 건드리지 않는다
+[*.{tscn,tres,godot,import,cfg}]
+trim_trailing_whitespace = false
+
+# Markdown: 줄 끝 공백 2칸이 줄바꿈 (기획서에서 사용 중)
+[*.md]
+trim_trailing_whitespace = false
+
+[*.py]
+indent_style = space
+indent_size = 4
+
+[*.json]
+indent_style = space
+indent_size = 2

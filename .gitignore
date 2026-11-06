@@ -1,0 +1,44 @@
+# ============================================================
+# ProjectSlash — Godot 4 (GDScript 전용) .gitignore
+# ============================================================
+
+# --- Godot 4: 에디터 캐시/임포트 결과 (언제든 재생성됨) ---
+.godot/
+/android/
+
+# 주의: 아래 파일은 반드시 커밋한다 (무시 금지)
+#   *.import            에셋 임포트 설정
+#   *.uid               Godot 4.4+ 리소스 UID (스크립트/셰이더 옆에 생성)
+#   export_presets.cfg  내보내기 프리셋 (Godot 4는 자격 증명을 .godot/ 에 따로 보관)
+
+# --- 내보내기 결과물 (Web/HTML5, Windows 빌드 등) ---
+/build/
+
+# --- Godot 3 잔재 / 기타 생성물 ---
+.import/
+export.cfg
+export_credentials.cfg
+*.translation
+*.tmp
+
+# --- Claude Code 개인/로컬 설정 (공유 설정 .claude/settings.json 은 커밋) ---
+.claude/settings.local.json
+.claude/worktrees/
+CLAUDE.local.md
+
+# --- 리뷰 페이지 등 로컬 산출물 (review-gallery). .gdignore 만 커밋해 Godot 임포트 방지 ---
+/output/*
+!/output/.gdignore
+
+# --- 검증 하네스 (Python) 부산물 ---
+__pycache__/
+*.pyc
+
+# --- OS / 에디터 ---
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.log
+.vscode/
+.idea/
