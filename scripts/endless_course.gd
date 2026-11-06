@@ -21,11 +21,14 @@ const GROUND_Y := 1100.0
 ## 풀에 둔 물체를 치워 두는 곳
 const PARKING := Vector2(-100000, -100000)
 const FALL_LINE_COLOR := Color(1.0, 0.3, 0.3, 0.8)
-## 공중 구조물 밑면에서 위험 구역 윗면까지 최소 거리 = 최대 스윙 반지름 220 + 플레이어 반지름·여유 40
-const SAFE_SWING_DEPTH := 260.0
+## 공중 구조물 밑면에서 위험 구역 윗면까지 최소 거리. 멀리서(약 380px) 걸면 로프를 다 감기 전에 원이 그만큼 깊이 내려가므로
+## 최대 스윙 반지름(220)이 아니라 걸 수 있는 거리 + 여유로 잡는다 (v0.2-3 2차: 260 이면 먼 연결에서 위험 구역에 닿음)
+const SAFE_SWING_DEPTH := 400.0
 
 @export var spawn := Vector2(200, 280)
 @export var fall_limit_y := 1000.0
+## 천장 (월드 Y): 이보다 위로 올라가면 게임 오버. 종유석 구조물이 여기에 매달린다 (v0.2-3 리뷰)
+@export var ceiling_y := -220.0
 ## 0 이면 실행마다 무작위 (디버그 표시의 COURSE 줄에 실제 시드가 나온다)
 @export var seed := 0
 @export_group("배치 규칙")
@@ -35,8 +38,18 @@ const SAFE_SWING_DEPTH := 260.0
 @export_range(0.0, 1.0) var switch_chance := 0.7
 ## 건물 비트가 '위험 구역 위 공중 구조물'일 확률
 @export_range(0.0, 1.0) var aerial_chance := 0.25
+## 건물 비트가 '천장에 매달린 종유석 구조물'일 확률 (높이 날 때 걸 곳, 밑에서 걸어 반시계로 돈다)
+@export_range(0.0, 1.0) var hanging_chance := 0.3
+## 바로 앞이 적 비트일 때의 종유석 확률 — 돌진 뒤에는 높이 떠 있어 솟은 건물에 걸기 어렵다
+@export_range(0.0, 1.0) var hanging_after_enemy_chance := 0.6
 ## 적 비트에 적이 2명 나올 확률
 @export_range(0.0, 1.0) var double_enemy_chance := 0.4
+## 솟은 건물 지붕에 가시가 깔릴 확률 (그 지붕에 내려앉으면 사망, v0.2-3)
+@export_range(0.0, 1.0) var roof_spike_chance := 0.2
+## 솟은 건물 앞 틈에 위아래로 움직이는 위험 기둥이 설 확률 (v0.2-3)
+@export_range(0.0, 1.0) var gap_pillar_chance := 0.2
+## 새 위험 장애물은 이만큼의 비트가 지난 뒤부터 (처음엔 익숙해질 시간)
+@export var hazard_free_beats := 4
 @export_group("풀")
 ## 플레이어 앞쪽으로 미리 만들어 두는 거리 (px)
 @export var look_ahead := 2600.0
@@ -44,7 +57,7 @@ const SAFE_SWING_DEPTH := 260.0
 @export var recycle_behind := 1000.0
 @export var building_pool := 14
 @export var enemy_pool := 14
-@export var hazard_pool := 5
+@export var hazard_pool := 10
 
 var rng := RandomNumberGenerator.new()
 ## 만든 비트 종류 기록 ("B" 건물, "E" 적) — 테스트·디버그용
@@ -92,6 +105,10 @@ func get_spawn_position() -> Vector2:
 
 func get_fall_limit_y() -> float:
 	return fall_limit_y
+
+
+func get_ceiling_y() -> float:
+	return ceiling_y
 
 
 func get_buildings() -> Array[Building]:
@@ -148,7 +165,10 @@ func _spawn_beat() -> void:
 		# 공중 구조물(+위험 구역)은 솟은 건물 바로 뒤에만: 건물에서 위로 튀어 오른 높이로 들어가야 걸 수 있다.
 		# 적 뒤에 두면 아래쪽 적을 벤 돌진이 플레이어를 아래로 보내 위험 구역에 바로 떨어진다 (봇 탐색에서 확인)
 		var after_rising := _run_kind == "B" and not _last_aerial and history.size() > 1
-		if after_rising and rng.randf() < aerial_chance:
+		var hang_chance := hanging_after_enemy_chance if _run_kind == "E" else hanging_chance
+		if history.size() > 1 and rng.randf() < hang_chance:
+			_hanging_beat()
+		elif after_rising and rng.randf() < aerial_chance:
 			_aerial_beat()
 		else:
 			_building_beat()
@@ -173,12 +193,45 @@ func _count(kind: String) -> void:
 
 ## 솟은 건물: 직전 높이 근처의 지붕, 공중에서 닿을 만한 간격
 func _building_beat() -> void:
-	var x := _cursor_x + rng.randf_range(260.0, 380.0)
+	var gap := rng.randf_range(260.0, 380.0)
+	var x := _cursor_x + gap
 	var roof := clampf(_lane_y + rng.randf_range(-90.0, 70.0), 300.0, 470.0)
 	var width := rng.randf_range(200.0, 260.0)
 	_place_building(Vector2(x, roof), width, rng.randf_range(70.0, 120.0))
+	var hazards_allowed := history.size() >= hazard_free_beats
+	if hazards_allowed and rng.randf() < gap_pillar_chance:
+		# 틈의 위험 기둥: 꼭대기가 띠 아래(지붕 +120 ~ +280)에서 오르내린다 — 띠에 걸고 넘어가면 닿지 않는 높이
+		var pillar: Hazard = _take("H")
+		pillar.size = Vector2(40.0, 700.0)
+		pillar.position = Vector2(x - gap * 0.5 - 20.0, roof + 200.0)
+		pillar.set_pooled(true)
+		pillar.start_bob(80.0, rng.randf_range(1.8, 2.8), rng.randf_range(0.0, 2.0))
+		_active.append(pillar)
+	if hazards_allowed and rng.randf() < roof_spike_chance:
+		# 지붕 가시: 왼쪽 30px 는 비워 둔다 (벽 띠를 노리는 조준선을 가리지 않게)
+		var spikes: Hazard = _take("H")
+		spikes.style = 1
+		spikes.size = Vector2(width - 40.0, 14.0)
+		spikes.position = Vector2(x + 30.0, roof - 14.0)
+		spikes.set_pooled(true)
+		_active.append(spikes)
 	_cursor_x = x + width
 	_lane_y = roof
+	_last_aerial = false
+
+
+## 천장에 매달린 종유석 구조물: 밑쪽 60px 만 띠. 밑에서 걸어 반시계로 돌며 넘는다 (돌진 뒤 높이 떠 있을 때 걸 곳)
+func _hanging_beat() -> void:
+	var x := _cursor_x + rng.randf_range(240.0, 360.0)
+	var bottom := clampf(_lane_y - rng.randf_range(150.0, 250.0), 40.0, 260.0)
+	var width := rng.randf_range(120.0, 180.0)
+	var top := ceiling_y - 300.0  # 천장 위 화면 밖까지 이어지게
+	var hanging := _place_building(Vector2(x, top), width, 60.0, true)
+	hanging.size = Vector2(width, bottom - top)
+	hanging.attach_band_top = hanging.size.y - 60.0
+	hanging.attach_band_depth = 60.0
+	_cursor_x = x + width
+	_lane_y = clampf(bottom + 180.0, 300.0, 470.0)
 	_last_aerial = false
 
 
@@ -188,7 +241,7 @@ func _aerial_beat() -> void:
 	var y := clampf(_lane_y - rng.randf_range(120.0, 200.0), 160.0, 300.0)
 	_place_building(Vector2(x, y), 220.0, 30.0, true)
 	# 위험 구역 윗면은 '밑면 + 최대 스윙 반지름 + 여유' 아래: 제대로 건 진자는 위험 구역에 닿지 않는다
-	var hazard_top := clampf(y + 30.0 + SAFE_SWING_DEPTH, 560.0, 780.0)
+	var hazard_top := clampf(y + 30.0 + SAFE_SWING_DEPTH, 560.0, 820.0)
 	var hazard: Hazard = _take("H")
 	hazard.position = Vector2(x - 60.0, hazard_top)
 	hazard.size = Vector2(340.0, GROUND_Y - hazard_top)
@@ -273,5 +326,8 @@ func _rect_of(node: Node2D) -> Rect2:
 
 func _draw() -> void:
 	draw_dashed_line(Vector2(-400.0, fall_limit_y), Vector2(_cursor_x + 400.0, fall_limit_y), FALL_LINE_COLOR, 3.0, 18.0)
+	draw_dashed_line(Vector2(-400.0, ceiling_y), Vector2(_cursor_x + 400.0, ceiling_y), FALL_LINE_COLOR, 3.0, 18.0)
+	draw_string(ThemeDB.fallback_font, Vector2(spawn.x, ceiling_y + 22), "CEILING (game over above)",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, FALL_LINE_COLOR)
 	draw_string(ThemeDB.fallback_font, Vector2(spawn.x, fall_limit_y - 10), "FALL LIMIT (game over below)",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, FALL_LINE_COLOR)

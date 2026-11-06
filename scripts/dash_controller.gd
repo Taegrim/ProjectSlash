@@ -154,6 +154,7 @@ func _end(reason: String, exit_velocity: Vector2) -> void:
 	_restore_mask()
 	target = null
 	player.velocity = exit_velocity
+	player.velocity.y = maxf(player.velocity.y, -tuning.max_exit_up_speed)  # 위로 솟는 기세 제한
 	if player.state == PlayerController.State.DASHING:
 		player.set_state(PlayerController.State.AIRBORNE)
 	# 돌진 종료 후 속도 정책 (§7.3): A안 즉시 상한 / B안 짧은 시간에 걸쳐 감속

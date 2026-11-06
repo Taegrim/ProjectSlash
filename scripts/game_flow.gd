@@ -23,6 +23,9 @@ var finished := false
 var elapsed := 0.0
 ## 점수·콤보 (v0.2-2)
 var score: ScoreKeeper
+## 시각 효과·효과음 (v0.2-3)
+var fx: FX
+var sfx: SFX
 
 
 func _ready() -> void:
@@ -46,6 +49,14 @@ func _ready() -> void:
 	score.process_mode = Node.PROCESS_MODE_PAUSABLE  # 일시정지 중에는 콤보 시간도 멈춘다
 	add_child(score)
 	score.setup(player, load("res://resources/default_score.tres"))
+	Engine.time_scale = 1.0  # 히트스톱 도중 재시작돼도 원래 속도로
+	fx = FX.new()
+	fx.process_mode = Node.PROCESS_MODE_PAUSABLE
+	add_child(fx)
+	fx.setup(player, camera)
+	sfx = SFX.new()
+	add_child(sfx)
+	sfx.setup(player, score)
 	WebSelfTest.attach_if_requested(self)  # 개발용: 웹 빌드를 ?selftest 로 열 때만 (tools/web_build.py --check)
 
 
@@ -58,6 +69,8 @@ func _physics_process(delta: float) -> void:
 	course.update_course(player.global_position.x)
 	if player.global_position.y > course.get_fall_limit_y():
 		player.die("fall")
+	elif player.global_position.y < course.get_ceiling_y():
+		player.die("ceiling")
 	elif player.global_position.x >= course.get_finish_x():
 		_finish()
 
@@ -91,6 +104,7 @@ func toggle_pause() -> void:
 ## 즉시 재시작 — 씬을 다시 불러와 모든 상태를 초기화한다. 게임 오버가 아니어도 동작한다.
 func restart() -> void:
 	get_tree().paused = false
+	Engine.time_scale = 1.0
 	get_tree().reload_current_scene()
 
 

@@ -14,6 +14,11 @@ func get_fall_limit_y() -> float:
 	return 1000.0
 
 
+## 천장 (월드 Y). 이보다 위로 올라가면 게임 오버. 없으면 -INF (고정 테스트 코스)
+func get_ceiling_y() -> float:
+	return -INF
+
+
 ## 결승선 (월드 X). 없으면 INF (무한 코스)
 func get_finish_x() -> float:
 	return INF

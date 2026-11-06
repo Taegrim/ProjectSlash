@@ -3,8 +3,9 @@ extends "res://tests/test_case.gd"
 
 const ENDLESS_SCENE := preload("res://scenes/endless.tscn")
 const ENDLESS_SCRIPT := preload("res://scripts/endless_course.gd")
-## 봇 통과 가능성 확인에 쓰는 시드들과 시드당 최대 시간 (프레임)
-const BOT_SEEDS := [11, 22, 33, 44, 55, 66, 77, 88]
+## 봇 통과 가능성 확인에 쓰는 시드들과 시드당 최대 시간 (프레임).
+## v0.2-3 에서 8개 → 16개: 8개로는 운에 따라 결과가 크게 흔들렸다 (위험 장애물 추가 후 같은 설정이 4/8 ~ 14/16)
+const BOT_SEEDS := [101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116]
 const BOT_FRAMES := 3600
 
 
@@ -65,7 +66,7 @@ func test_bot_survives_long_runs_on_most_seeds() -> void:
 			return "%.0f" % d)), median, deaths])
 	var long_runs := distances.filter(func(d: float) -> bool: return d > 8000.0).size()
 	check(median > 15000.0, "중앙값 15000px 넘게 진행 (%.0f)" % median)
-	check(long_runs >= 6, "8개 시드 중 6개 이상이 8000px 넘게 진행 (%d 개)" % long_runs)
+	check(long_runs >= 12, "16개 시드 중 12개 이상이 8000px 넘게 진행 (%d 개)" % long_runs)
 
 
 ## 자식 없이 코스만 (게임 흐름 없이 생성·회수만 확인)

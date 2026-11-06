@@ -104,7 +104,9 @@ func get_box_rect() -> Rect2:
 func _pulse_combo() -> void:
 	if _pulse:
 		_pulse.kill()
-	_combo_label.pivot_offset = _combo_label.size / 2.0
+	# 오른쪽 배치는 화면 끝에 붙어 있으므로 오른쪽 끝을 기준으로 커져야 잘리지 않는다
+	var pivot_x := _combo_label.size.x if layout == Layout.RIGHT else (0.0 if layout == Layout.LEFT else _combo_label.size.x / 2.0)
+	_combo_label.pivot_offset = Vector2(pivot_x, _combo_label.size.y / 2.0)
 	_combo_label.scale = Vector2(1.35, 1.35)
 	_pulse = create_tween()
 	_pulse.tween_property(_combo_label, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)

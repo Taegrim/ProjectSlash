@@ -6,6 +6,7 @@ extends CanvasLayer
 const DEATH_TEXT := {
 	"fall": "fell below the limit",
 	"hazard": "hit a hazard",
+	"ceiling": "flew above the ceiling",
 }
 
 ## 점수·콤보 HUD 위치 (사용자 시안 선택 전 임시: 우측). 개발용으로 환경 변수 HUD_LAYOUT=right|left|top|bottom 이 우선
