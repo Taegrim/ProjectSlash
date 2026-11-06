@@ -1,7 +1,7 @@
 ## 돌진 베기 컨트롤러 — 적 자동 타기팅, 고속 돌진, 적 처치, 종료 후 속도 정책 (기획서 §7, §9.2).
 ##
 ## 지켜야 할 확정 규칙 (기획서 §7, §15):
-## - 적에게만 쓴다. 조준 없이 우클릭으로 범위 안의 적을 자동으로 고른다.
+## - 적에게만 쓴다. 띠가 아닌 곳을 조준한 좌클릭(한 버튼, §4) 또는 우클릭(두 버튼 실험 모드)으로, 조준과 무관하게 범위 안의 적을 자동으로 고른다.
 ## - 타깃 우선순위 (§7.2): 살아 있음 → 전방(+X) → 사거리 안 → 전방에서 가장 가까운 적(전방 거리, 같으면 실제 거리).
 ##   후보가 없으면 돌진하지 않고 상태도 바꾸지 않는다 (§9.2 [MVP 제안]).
 ## - 돌진은 공격이자 이동 수단이며 적을 관통해 전방으로 진행한다. 돌진 중 추가 타기팅·재돌진은 없다.
@@ -50,7 +50,7 @@ func setup(owner_player: PlayerController, dash_tuning: DashTuning) -> void:
 	tuning = dash_tuning
 
 
-## 지금 우클릭하면 돌진할 적을 고른다. {enemy, reason} — 후보가 없으면 enemy 는 null
+## 지금 돌진하면 벨 적을 고른다. {enemy, reason} — 후보가 없으면 enemy 는 null
 func find_target() -> Dictionary:
 	var origin := player.global_position
 	var best: Enemy = null
@@ -76,7 +76,7 @@ func find_target() -> Dictionary:
 	return {"enemy": best, "reason": "" if best else reason}
 
 
-## 우클릭: 유효 타깃이 있으면 돌진, 없으면 아무것도 하지 않는다 (와이어 상태 유지).
+## 돌진 요청: 유효 타깃이 있으면 돌진, 없으면 아무것도 하지 않는다 (상태 유지, §9.2).
 func request_dash() -> void:
 	if player.state == PlayerController.State.DEAD or player.state == PlayerController.State.DASHING:
 		last_request = "dash ignored (%s)" % player.get_state_name()

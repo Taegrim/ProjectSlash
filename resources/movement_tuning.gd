@@ -4,6 +4,12 @@
 class_name MovementTuning
 extends Resource
 
+## 공중 좌우 조작 (기획서 §4 [확정]: 방향키 없는 A안으로 먼저 개발, 좌우로 공중 속도를 미세 조정하는 B안을 A/B 테스트)
+enum AirControlMode {
+	NONE, ## A안: 방향키 없음
+	FINE, ## B안: 좌우 키로 체공 중 전진 속도를 미세 조정
+}
+
 ## 최고 속도를 어떤 기준으로 제한할지 (§5.2 [중요]: 두 방식을 모두 시험할 수 있어야 한다)
 enum SpeedCapMode {
 	HORIZONTAL_AND_TOTAL, ## 수평 속도 상한 + 과도한 전체 속력 방지 상한 (기획서 초안 권장)
@@ -39,3 +45,13 @@ enum SpeedCapMode {
 @export var camera_vertical_follow_limit: float = 200.0
 ## 카메라 Y 를 플레이어 쪽으로 옮기는 세기 (1/s, 클수록 빨리 따라감). §3 'Y 축 완만 보정' — §12 에 없어 추가한 값
 @export var camera_vertical_smoothing: float = 4.0
+
+@export_group("공중 좌우 조작 (A/B)")
+## 기본 조작 방식. 게임 중 F2 로 바꿔 비교할 수 있다 (바꾼 값은 재시작해도 유지)
+@export var air_control_mode: AirControlMode = AirControlMode.NONE
+## B안: 오른쪽/왼쪽을 누르면 목표 전진 속도를 이만큼 올리고 내린다 (px/s)
+@export var air_control_speed_offset: float = 180.0
+## B안: 왼쪽을 눌러도 이보다 느려지지 않는다 (자동 전진 유지, 멈추거나 뒤로 가지 않음)
+@export var air_control_min_speed: float = 140.0
+## B안: 좌우 입력으로 속도를 바꾸는 가속도 (px/s²)
+@export var air_control_acceleration: float = 900.0

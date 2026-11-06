@@ -30,6 +30,30 @@ func _ready() -> void:
 	move_child(hud, 0)  # 일시정지·게임 오버 글자가 HUD 위에 오게
 
 
+var _air_text := "A"
+var _scheme_text := ""
+
+
+## 조작 안내 줄 끝에 공중 좌우 조작 방식 표시 (F2 로 A/B 전환)
+func set_air_control(mode: MovementTuning.AirControlMode) -> void:
+	_air_text = "A" if mode == MovementTuning.AirControlMode.NONE else "B (A/D)"
+	_refresh_hint()
+
+
+## 조작 안내 줄 앞부분 = 입력 방식 (F3 으로 한 버튼 / 두 버튼 전환, v0.2-5)
+func set_input_scheme(one_button: bool) -> void:
+	_scheme_text = ("LMB = wire on yellow band (hold, release = jump) / dash elsewhere (red ring)" if one_button
+			else "LMB hold = wire (yellow band)    RMB dash (red ring)")
+	_refresh_hint()
+
+
+func _refresh_hint() -> void:
+	var hint: Label = $HintLabel
+	if not hint.has_meta("base"):
+		hint.set_meta("base", hint.text)
+	hint.text = "%s    %s    F3 input    F2 air: %s" % [_scheme_text, hint.get_meta("base"), _air_text]
+
+
 func set_debug_visible(enabled: bool) -> void:
 	_debug_panel.visible = enabled
 

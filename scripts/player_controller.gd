@@ -7,7 +7,7 @@
 ##
 ## 입력은 _unhandled_input 한 곳에서 '의도'(조준 지점, 와이어 연결/해제, 돌진)로 바꿔 하위 컨트롤러에 넘긴다.
 ## 모바일 터치 입력은 나중에 같은 request_* 함수를 부르면 된다 (입력과 핵심 게임플레이 분리).
-## 마우스 조준은 와이어에만 쓰고, 돌진은 조준 없이 자동 타기팅이다 (§4 [확정]).
+## 좌클릭 하나로 와이어·돌진 (§4 [확정]): 누른 순간 조준이 건물 연결 띠 위면 와이어, 아니면 돌진. 돌진 대상은 조준과 무관한 자동 타기팅.
 ##
 ## Phase 1: AIRBORNE 이동(자동 전진·중력·속도 상한), 충돌 감속, 사망.
 ## Phase 2: GRAPPLING (와이어 스윙 — 속도 계산은 GrappleController, 이동·충돌은 여기서).
@@ -48,7 +48,16 @@ var bump_count := 0
 var death_reason := ""
 ## 조준점 연결 가능 여부 미리보기 (GrappleController.evaluate 결과)
 var aim_preview := {}
-## 지금 우클릭하면 돌진할 대상 {enemy, reason} (표시용)
+## 공중 좌우 조작 방식 (A/B). 게임 중 바꾼 값을 재시작해도 유지하려고 static 으로 둔다. -1 이면 튜닝 기본값
+static var air_control_override := -1
+## 이번 프레임 좌우 입력 (-1 ~ 1). B안일 때만 읽는다. 테스트·봇은 debug_air_input 으로 넣는다
+var air_input := 0.0
+var debug_air_input := NAN
+## 한 버튼 방식 기본값 (v0.2-5 사용자 결정: 좌클릭 하나로 와이어·돌진). false = 예전 두 버튼 (좌 와이어 / 우 돌진)
+@export var one_button_default := true
+## 게임 중 F3 로 바꾼 입력 방식 (재시작해도 유지하려고 static). -1 = one_button_default, 1 = 한 버튼, 0 = 두 버튼
+static var one_button_override := -1
+## 지금 돌진하면 벨 대상 {enemy, reason} (표시용)
 var dash_preview := {}
 ## 캡처·테스트용: 유한한 값이면 마우스 대신 이 지점을 조준점으로 쓴다
 var debug_aim_override := Vector2.INF
@@ -72,6 +81,9 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	aim_point = debug_aim_override if debug_aim_override.is_finite() else get_global_mouse_position()
 	aim_preview = grapple.evaluate(aim_point) if state == State.AIRBORNE else {}
+	air_input = 0.0
+	if get_air_control_mode() == MovementTuning.AirControlMode.FINE:
+		air_input = debug_air_input if not is_nan(debug_air_input) else Input.get_axis("move_left", "move_right")
 	dash_preview = dash.find_target() if state in [State.AIRBORNE, State.GRAPPLING] else {}
 	match state:
 		State.AIRBORNE:
@@ -98,19 +110,40 @@ func _unhandled_input(event: InputEvent) -> void:
 	if state == State.DEAD:
 		return
 	if event.is_action_pressed("grapple"):
-		grapple.request_attach(aim_point if debug_aim_override.is_finite() else get_global_mouse_position())
+		press_action(aim_point if debug_aim_override.is_finite() else get_global_mouse_position())
 	elif event.is_action_released("grapple"):
 		grapple.request_release()
 	elif event.is_action_pressed("dash"):
 		dash.request_dash()
 
 
+## 좌클릭(주 버튼) 누름. 한 버튼 방식(v0.2-5)이면 조준이 건물 연결 띠 위일 때만 와이어, 아니면 돌진(자동 타기팅).
+## 두 버튼 방식이면 언제나 와이어 (돌진은 우클릭). 우클릭 돌진은 두 방식 모두 그대로 쓸 수 있다.
+## 반환: "wire" | "dash" (요청 결과는 각 컨트롤러의 last_request 에 남는다)
+func press_action(at: Vector2) -> String:
+	if is_one_button() and not grapple.evaluate(at).get("ok", false):
+		dash.request_dash()
+		return "dash"
+	grapple.request_attach(at)
+	return "wire"
+
+
+## 지금 한 버튼 방식인지 (게임 중 F3 로 바꾼 값이 우선)
+func is_one_button() -> bool:
+	return one_button_default if one_button_override < 0 else one_button_override == 1
+
+
 ## 일반 체공: 중력 + 기본 전진 속도로 접근(느리면 가속, 빠르면 감속) + 속도 상한 → 충돌 검사 이동 → 새 접촉이면 감속
 ## (§5.1, §8). 해제·돌진 직후의 상한 초과분은 over_cap_deceleration 으로 점차 줄인다.
 func _step_airborne(delta: float) -> void:
 	velocity.y += movement.gravity * delta
-	var rate := movement.air_acceleration if velocity.x < movement.auto_forward_speed else movement.air_deceleration
-	velocity.x = move_toward(velocity.x, movement.auto_forward_speed, rate * delta)
+	# 목표 전진 속도: A안은 기본 전진 속도, B안은 좌우 입력만큼 올리고 내린다 (최소 속도 아래로는 안 감)
+	var target := movement.auto_forward_speed
+	var rate := movement.air_acceleration if velocity.x < target else movement.air_deceleration
+	if air_input != 0.0:
+		target = maxf(target + air_input * movement.air_control_speed_offset, movement.air_control_min_speed)
+		rate = movement.air_control_acceleration
+	velocity.x = move_toward(velocity.x, target, rate * delta)
 	var decay := _extra_deceleration * delta
 	_extra_horizontal = maxf(0.0, _extra_horizontal - decay)
 	_extra_total = maxf(0.0, _extra_total - decay)
@@ -193,6 +226,11 @@ func set_state(next: State) -> void:
 	queue_redraw()
 
 
+## 지금 공중 좌우 조작 방식 (게임 중 F2 로 바꾼 값이 우선)
+func get_air_control_mode() -> MovementTuning.AirControlMode:
+	return movement.air_control_mode if air_control_override < 0 else air_control_override as MovementTuning.AirControlMode
+
+
 func get_state_name() -> String:
 	return State.keys()[state]
 
@@ -210,7 +248,7 @@ func _draw() -> void:
 		draw_arc(aim, 8.0, 0.0, TAU, 18, aim_color, 2.0)
 		if valid:
 			draw_circle(to_local(aim_preview.point), 4.0, aim_color)  # 실제로 걸릴 지점
-	# 돌진 타깃 미리보기: 지금 우클릭하면 벨 적 (§7.2 자동 선택 결과를 보여 준다)
+	# 돌진 타깃 미리보기: 지금 돌진하면 벨 적 (§7.2 자동 선택 결과를 보여 준다)
 	var target: Enemy = dash_preview.get("enemy")
 	if target != null:
 		draw_arc(to_local(target.global_position), target.radius + 8.0, 0.0, TAU, 24, Color(1.0, 0.45, 0.35, 0.9), 3.0)

@@ -59,16 +59,17 @@ func test_buildings_have_attach_band_inside_bounds() -> void:
 
 
 func test_input_map_matches_design() -> void:
-	# §4: 좌클릭 = 와이어, 우클릭 = 돌진 [확정] / ESC 일시정지, R 재시작 [MVP 제안]
+	# §4: 좌클릭 = 와이어·돌진(조준 위치로 구분) [확정], 우클릭 = 돌진(두 버튼 실험 모드) / ESC 일시정지, R 재시작 [MVP 제안]
 	check(_has_mouse_button("grapple", MOUSE_BUTTON_LEFT), "grapple = 마우스 왼쪽")
 	check(_has_mouse_button("dash", MOUSE_BUTTON_RIGHT), "dash = 마우스 오른쪽")
 	check(_has_key("pause", KEY_ESCAPE), "pause = ESC")
 	check(_has_key("restart", KEY_R), "restart = R")
 	check(_has_key("toggle_debug", KEY_F1), "toggle_debug = F1")
 	check(_has_key("toggle_overview", KEY_TAB), "toggle_overview = Tab")
-	# §4 [확정] v0.1 은 방향키를 쓰지 않는다 — 게임 액션에 방향키가 묶여 있으면 안 됨 (Godot 기본 ui_* 제외)
+	# §4 [확정] 방향키 없는 A안이 기본 — 게임 액션에 방향키가 묶여 있으면 안 됨 (Godot 기본 ui_* 제외).
+	# 예외: 같은 절의 'B안 A/B 테스트'용 move_left/move_right (B안일 때만 읽는다 — test_v02_air_control 이 A안에서 무시됨을 확인)
 	for action in InputMap.get_actions():
-		if String(action).begins_with("ui_"):
+		if String(action).begins_with("ui_") or action in [&"move_left", &"move_right"]:
 			continue
 		for event in InputMap.action_get_events(action):
 			if event is InputEventKey and (event as InputEventKey).physical_keycode in ARROW_KEYS:

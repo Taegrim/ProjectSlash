@@ -57,6 +57,8 @@ func _ready() -> void:
 	sfx = SFX.new()
 	add_child(sfx)
 	sfx.setup(player, score)
+	ui.set_air_control(player.get_air_control_mode())
+	ui.set_input_scheme(player.is_one_button())
 	WebSelfTest.attach_if_requested(self)  # 개발용: 웹 빌드를 ?selftest 로 열 때만 (tools/web_build.py --check)
 
 
@@ -84,6 +86,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		toggle_debug()
 	elif event.is_action_pressed("toggle_overview"):
 		toggle_overview()
+	elif event.is_action_pressed("toggle_air_control"):
+		toggle_air_control()
+	elif event.is_action_pressed("toggle_input_scheme"):
+		toggle_input_scheme()
 
 
 func _process(_delta: float) -> void:
@@ -106,6 +112,20 @@ func restart() -> void:
 	get_tree().paused = false
 	Engine.time_scale = 1.0
 	get_tree().reload_current_scene()
+
+
+## 공중 좌우 조작 A/B 전환 (F2). 재시작해도 유지된다
+func toggle_air_control() -> void:
+	var next := MovementTuning.AirControlMode.FINE if player.get_air_control_mode() == MovementTuning.AirControlMode.NONE 			else MovementTuning.AirControlMode.NONE
+	PlayerController.air_control_override = next
+	ui.set_air_control(next)
+
+
+## 입력 방식 전환 (F3): 한 버튼(좌클릭 = 띠 조준이면 와이어, 아니면 돌진) ↔ 두 버튼(좌 와이어 / 우 돌진). 재시작해도 유지
+func toggle_input_scheme() -> void:
+	var one := not player.is_one_button()
+	PlayerController.one_button_override = 1 if one else 0
+	ui.set_input_scheme(one)
 
 
 func toggle_debug() -> void:
@@ -177,6 +197,8 @@ func _debug_text() -> String:
 		"WIRE   %s" % player.grapple.describe(),
 		"AIM    %s" % ("attachable" if player.aim_preview.get("ok", false) else player.aim_preview.get("reason", "-")),
 		"DASH   %s" % player.dash.describe(),
+		"AIR    %s  input %+.0f" % ["A (none)" if player.get_air_control_mode() == MovementTuning.AirControlMode.NONE
+				else "B (fine)", player.air_input],
 		"FALL   y > %.0f = game over" % course.get_fall_limit_y(),
 		"CAM    y %.0f  (lowest %.0f)%s" % [camera.global_position.y, camera.get_lowest_y(),
 				"  overview" if camera.overview else ""],

@@ -17,6 +17,11 @@ const MAX_REACH_AERIAL := 380.0
 var player: PlayerController
 var course: CourseBase
 var actions := 0
+## true 면 와이어를 먼저 시도하고 걸 곳이 없을 때만 돌진 (한 버튼 합치기 분석용, tests/analysis_one_button.gd)
+var prefer_wire := false
+## 할 수 있는 행동이 생긴 뒤 이만큼 프레임을 기다렸다 행동 (사람의 반응 시간 흉내, 분석용. 0 = 즉시)
+var reaction_frames := 0
+var _wait := 0
 
 var _held := 0
 var _cooldown := 0
@@ -39,7 +44,15 @@ func step() -> void:
 		_cooldown -= 1
 	match player.state:
 		PlayerController.State.AIRBORNE:
-			if player.dash.find_target().enemy != null:
+			if reaction_frames > 0:
+				var available := player.dash.find_target().enemy != null or (_cooldown == 0 and find_anchor() != null)
+				_wait = _wait + 1 if available else 0
+				if _wait <= reaction_frames:
+					return
+				_wait = 0
+			if prefer_wire and _cooldown == 0 and find_anchor() != null:
+				_try_attach()
+			elif player.dash.find_target().enemy != null:
 				player.dash.request_dash()
 				actions += 1
 			elif _cooldown == 0:
@@ -56,7 +69,24 @@ func step() -> void:
 				actions += 1
 
 
+## 지금 걸 만한 건물 (없으면 null) — 분석 스크립트도 쓴다
+func find_anchor() -> Building:
+	return _best_anchor()[0]
+
+
 func _try_attach() -> void:
+	var picked: Array = _best_anchor()
+	var best: Building = picked[0]
+	if best == null:
+		return
+	player.grapple.request_attach(picked[1])
+	if player.grapple.is_attached:
+		_last_building = best
+		_held = 0
+		actions += 1
+
+
+func _best_anchor() -> Array:
 	var best: Building = null
 	var best_aim := Vector2.ZERO
 	for building in course.get_buildings():
@@ -77,10 +107,4 @@ func _try_attach() -> void:
 		if best == null or rect.position.x < best.get_rect().position.x:
 			best = building
 			best_aim = aim
-	if best == null:
-		return
-	player.grapple.request_attach(best_aim)
-	if player.grapple.is_attached:
-		_last_building = best
-		_held = 0
-		actions += 1
+	return [best, best_aim]
