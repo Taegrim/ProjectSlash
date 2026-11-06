@@ -19,11 +19,21 @@ const LABEL_COLOR := Color(0.85, 0.88, 0.95)
 		size = value.max(Vector2(10, 10))
 		_sync_collider()
 		queue_redraw()
-## 와이어 연결 가능 띠의 깊이 (px, 지붕 기준 아래로) — [튜닝]
+## 와이어 연결 가능 띠가 지붕에서 얼마나 내려가서 시작하는지 (px) — [튜닝]. 0 이면 지붕부터.
+## 레벨 디자인에서 '연결점이 낮아 더 크게 돌아 올라가야 하는' 건물을 만들 때 쓴다. 테스트 코스는 모두 0
+## (2차 수정 리뷰 11번: 난이도는 실제 레벨 디자인에서 잡고, 지금은 띠가 지붕까지 닿아야 함)
+@export var attach_band_top := 0.0:
+	set(value):
+		attach_band_top = maxf(value, 0.0)
+		queue_redraw()
+## 와이어 연결 가능 띠의 깊이 (px, 띠 시작점부터 아래로) — [튜닝]
 @export var attach_band_depth := 80.0:
 	set(value):
 		attach_band_depth = maxf(value, 0.0)
 		queue_redraw()
+## 공중 구조물인지 (아래가 비어 있는 다리·간판 등). 와이어를 걸면 반시계 방향(아래 → 오른쪽 → 위)으로 돈다.
+## false 면 아래에서 솟은 건물로 보고 시계 방향(왼쪽 → 위 → 지붕 쪽)으로 돈다 (Phase 2 리뷰 10번, 수정 리뷰 10번)
+@export var aerial := false
 ## 디버그 표시 이름 (테스트 코스의 A, B, E 등)
 @export var debug_label := "":
 	set(value):
@@ -44,7 +54,14 @@ func _ready() -> void:
 
 ## 와이어 연결 가능 영역 (전역 좌표). 띠가 건물보다 깊으면 건물 높이까지만.
 func get_attach_rect() -> Rect2:
-	return Rect2(global_position, Vector2(size.x, minf(attach_band_depth, size.y)))
+	var band := _band_rect()
+	return Rect2(global_position + band.position, band.size)
+
+
+## 띠 영역 (건물 기준 좌표)
+func _band_rect() -> Rect2:
+	var top := minf(attach_band_top, size.y)
+	return Rect2(Vector2(0.0, top), Vector2(size.x, minf(attach_band_depth, size.y - top)))
 
 
 ## 건물 전체 영역 (전역 좌표)
@@ -62,7 +79,7 @@ func _sync_collider() -> void:
 func _draw() -> void:
 	var body := Rect2(Vector2.ZERO, size)
 	draw_rect(body, BODY_COLOR)
-	draw_rect(Rect2(Vector2.ZERO, Vector2(size.x, minf(attach_band_depth, size.y))), ATTACH_COLOR)
+	draw_rect(_band_rect(), ATTACH_COLOR)
 	draw_rect(body, OUTLINE_COLOR, false, 2.0)
 	if not debug_label.is_empty():
 		draw_string(ThemeDB.fallback_font, Vector2(6, -10), debug_label, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, LABEL_COLOR)

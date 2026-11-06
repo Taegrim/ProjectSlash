@@ -16,8 +16,13 @@ enum SpeedCapMode {
 @export var auto_forward_speed: float = 320.0
 ## 중력 가속도 (px/s²) — Gravity. Phase 1 에서 900 → 520 (무조작 시 A 벽 충돌·감속 흐름이 보이고 체공감에 가깝게)
 @export var gravity: float = 520.0
-## 전진 속도로 다가가는 공중 가속도 (px/s²) — AirAcceleration
+## 전진 속도보다 느릴 때 다가가는 공중 가속도 (px/s²) — AirAcceleration
 @export var air_acceleration: float = 600.0
+## 전진 속도보다 빠를 때 줄이는 감속도 (px/s², §5.1 '감속 강도'). 작을수록 스윙·돌진에서 얻은 관성이 오래 간다
+@export var air_deceleration: float = 150.0
+## 와이어 해제·돌진 직후 체공 상한을 넘는 몫을 줄이는 감속도 (px/s²). 즉시 자르지 않아 해제 시 수평 관성을
+## 보존하되(§6.4 [확정]), 상한 초과 속도가 영구히 유지되지는 않게 한다(§5.2 [확정])
+@export var over_cap_deceleration: float = 900.0
 ## 일반 체공 수평 속도 상한 (px/s) — MaxAirHorizontalSpeed
 @export var max_air_horizontal_speed: float = 520.0
 ## 일반 체공 전체 속력 상한 (px/s) — MaxAirTotalSpeed

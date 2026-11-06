@@ -8,6 +8,9 @@
 ##   --shots=이름@프레임,...      해당 프레임에 <out>/<이름>.png 저장 (기본 start@30)
 ##   --press=액션@프레임,...      해당 프레임에 입력 액션을 누른다 (예: restart@150, toggle_overview@200)
 ##   --record=시작-끝[:간격]      구간 프레임을 <out>/frames/f_0000.png … 로 저장 (GIF 재료, 간격 기본 2)
+##   --call=명령@프레임;...       플레이어 와이어 조작 (구분자는 ';'):
+##                                aim:x,y (조준점 고정 — 마우스 대신), attach (조준점으로 연결), release (해제)
+##                                예) --call="aim:626,430@40;attach@53;release@83"
 ##   --overview                   마지막에 코스 전체 보기를 켜고 <out>/overview.png 저장
 extends SceneTree
 
@@ -19,7 +22,7 @@ func _initialize() -> void:
 
 
 func _run() -> void:
-	var options := {"out": "", "scene": "res://scenes/main.tscn", "shots": "start@30", "press": "", "record": ""}
+	var options := {"out": "", "scene": "res://scenes/main.tscn", "shots": "start@30", "press": "", "record": "", "call": ""}
 	var overview := false
 	for arg in OS.get_cmdline_user_args():
 		if arg == "--overview":
@@ -36,6 +39,7 @@ func _run() -> void:
 
 	var shots := _parse_at_list(options["shots"])
 	var presses := _parse_at_list(options["press"])
+	var calls := _parse_at_list(String(options["call"]).replace(",", "|").replace(";", ","))  # 좌표의 ',' 보호
 	var record_from := -1
 	var record_to := -1
 	var record_step := 2
@@ -53,13 +57,15 @@ func _run() -> void:
 	await process_frame
 
 	var last_frame := record_to
-	for frame_list in [shots.keys(), presses.keys()]:
+	for frame_list in [shots.keys(), presses.keys(), calls.keys()]:
 		for frame in frame_list:
 			last_frame = maxi(last_frame, frame)
 	var recorded := 0
 	for frame in range(0, last_frame + 1):
 		for action in presses.get(frame, []):
 			_press(action)
+		for command in calls.get(frame, []):
+			_call_player(String(command).replace("|", ","))
 		await process_frame
 		for shot_name in shots.get(frame, []):
 			_save(_out.path_join(shot_name + ".png"))
@@ -89,6 +95,27 @@ func _parse_at_list(text: String) -> Dictionary:
 			result[frame] = []
 		result[frame].append(pair[0])
 	return result
+
+
+## aim:x,y / attach / release — 현재 씬의 Player 노드에 직접 명령한다 (재시작 뒤에도 새 Player 를 찾는다)
+func _call_player(command: String) -> void:
+	var player := current_scene.find_child("Player", true, false) if current_scene else null
+	if player == null:
+		printerr("Player 노드를 찾지 못함: " + command)
+		return
+	if command.begins_with("aim:"):
+		var xy := command.trim_prefix("aim:").split(",")
+		player.set("debug_aim_override", Vector2(float(xy[0]), float(xy[1])))
+	elif command == "attach":
+		player.get("grapple").call("request_attach", player.get("debug_aim_override"))
+	elif command == "release":
+		player.get("grapple").call("request_release")
+	else:
+		printerr("알 수 없는 명령: " + command)
+		return
+	# 헤드리스 탐색 결과와 맞춰 보기 위해 명령 시점의 위치·결과를 남긴다
+	print("call %s at pos %s -> %s" % [command, Vector2(player.get("global_position")).round(),
+			player.get("grapple").get("last_request")])
 
 
 func _press(action: String) -> void:

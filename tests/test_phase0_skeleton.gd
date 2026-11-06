@@ -44,14 +44,16 @@ func test_fall_limit_is_below_everything_reachable() -> void:
 
 
 func test_buildings_have_attach_band_inside_bounds() -> void:
-	# §6.2 [MVP 제안] 건물별 유효 와이어 영역 = 지붕부터의 상단 띠
+	# §6.2 [MVP 제안] 건물별 유효 와이어 영역 = 지붕부터의 상단 띠 (attach_band_top 은 레벨 디자인용, 테스트 코스는 모두 0)
 	var course: TestCourse = add_node(COURSE_SCENE.instantiate())
 	await physics_frames(1)
 	for building in course.get_buildings():
 		var band := building.get_attach_rect()
 		check(band.size.y > 0.0, "%s: 연결 띠가 있어야 함" % building.name)
 		check(building.get_rect().encloses(band), "%s: 연결 띠가 건물 안에 있어야 함" % building.name)
-		check_eq(band.position, building.global_position, "%s: 띠는 지붕에서 시작" % building.name)
+		check_eq(band.position, building.global_position + Vector2(0, building.attach_band_top),
+				"%s: 띠는 지붕에서 attach_band_top 만큼 아래에서 시작" % building.name)
+		check_eq(building.attach_band_top, 0.0, "%s: 테스트 코스의 띠는 지붕까지 닿음 (2차 수정 리뷰 11번)" % building.name)
 
 
 func test_input_map_matches_design() -> void:
