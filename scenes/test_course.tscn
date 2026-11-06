@@ -37,6 +37,13 @@ size = Vector2(260, 720)
 attach_band_depth = 80.0
 debug_label = "E  reconnect"
 
+[node name="AerialF" parent="." instance=ExtResource("2_building")]
+position = Vector2(3120, 170)
+size = Vector2(220, 30)
+attach_band_depth = 30.0
+aerial = true
+debug_label = "F  aerial (swing under)"
+
 [node name="HazardZone" parent="." instance=ExtResource("4_hazard")]
 position = Vector2(3250, 560)
 size = Vector2(180, 540)

@@ -4,6 +4,7 @@
 ## 사망 판정은 다른 전환보다 먼저 본다 (§9.2 [MVP 제안] 우선순위).
 ## 재시작 (§4 R [MVP 제안], §13.2-16): 씬을 다시 불러와 위치·속도·와이어·돌진 타깃·적·점수를 모두 처음으로 되돌린다.
 ## 거리 점수는 '최대 도달 X' 기준 (§11 [MVP 제안]) — v0.1 은 표시만.
+## 코스 클리어 (Phase 4): 살아서 결승선을 넘으면 세계를 멈추고 시간·거리·처치 수를 보여 준다. R 로 바로 다시 시작.
 ## 입력 처리는 함수(toggle_pause, restart, ...)로 나눠 두어 테스트와 이후 터치 UI 가 같은 경로를 쓴다.
 extends Node2D
 
@@ -17,6 +18,9 @@ var max_x := 0.0
 var debug_visible := true
 var game_over := false
 var game_over_reason := ""
+var finished := false
+## 플레이 시간 (s) — 일시정지·게임 오버·클리어 뒤에는 멈춘다
+var elapsed := 0.0
 
 
 func _ready() -> void:
@@ -36,15 +40,19 @@ func _ready() -> void:
 	camera.overview_rect = course.get_bounds()
 	camera.configure(player, player.movement, course.get_spawn_position().y)
 	_apply_debug_visible()
+	WebSelfTest.attach_if_requested(self)  # 개발용: 웹 빌드를 ?selftest 로 열 때만 (tools/web_build.py --check)
 
 
-func _physics_process(_delta: float) -> void:
-	if game_over or get_tree().paused:
+func _physics_process(delta: float) -> void:
+	if game_over or finished or get_tree().paused:
 		return
+	elapsed += delta
 	# 거리는 사망 판정 전에 갱신해야 게임 오버 표시와 디버그 값이 일치한다
 	max_x = maxf(max_x, player.global_position.x)
 	if player.global_position.y > course.fall_limit_y:
 		player.die("fall")
+	elif player.global_position.x >= course.global_position.x + course.finish_x:
+		_finish()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -64,7 +72,7 @@ func _process(_delta: float) -> void:
 
 
 func toggle_pause() -> void:
-	if game_over:
+	if game_over or finished:
 		return
 	get_tree().paused = not get_tree().paused
 	ui.set_paused(get_tree().paused)
@@ -91,6 +99,12 @@ func get_distance() -> float:
 	return max_x - start_x
 
 
+func _finish() -> void:
+	finished = true
+	get_tree().paused = true  # 세계를 멈춘다 (Main 은 계속 입력을 받아 R 로 재시작)
+	ui.show_clear(elapsed, get_distance(), player.dash.kill_count)
+
+
 func _on_hazard_touched(_hazard: Hazard) -> void:
 	player.die("hazard")
 
@@ -115,6 +129,7 @@ func _debug_text() -> String:
 		"POS    (%.0f, %.0f)" % [player.global_position.x, player.global_position.y],
 		"VEL    (%.0f, %.0f)   |v| %.0f" % [v.x, v.y, v.length()],
 		"DIST   %.0f px  (max x)" % get_distance(),
+		"TIME   %.1f s" % elapsed,
 		"BUMPS  %d   (contact = slow, not death)" % player.bump_count,
 		"WIRE   %s" % player.grapple.describe(),
 		"AIM    %s" % ("attachable" if player.aim_preview.get("ok", false) else player.aim_preview.get("reason", "-")),

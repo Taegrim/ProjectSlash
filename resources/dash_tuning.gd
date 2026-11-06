@@ -19,6 +19,9 @@ enum PostDashVelocityPolicy {
 @export var dash_end_offset: float = 90.0
 ## 돌진 최대 시간 (s) — MaxDashDuration. 사거리 480 + 적 뒤 90 을 1200px/s 로 가려면 0.48초 → 0.45 에서 0.6 으로
 @export var max_dash_duration: float = 0.6
-@export var post_dash_velocity_policy: PostDashVelocityPolicy = PostDashVelocityPolicy.GRADUAL_DECELERATION
-## 점진 감속일 때의 감속도 (px/s²) — PostDashDeceleration
+## 지금은 IMMEDIATE_CAP (Phase 4 리뷰 7번: "돌진 후 감속을 천천히 말고 바로"). 점진 감속 코드는 그대로 남아 있어
+## 이 값 하나만 바꾸면 된다: 에디터에서 resources/default_dash.tres 를 열고 인스펙터의 Post Dash Velocity Policy 를
+## Gradual Deceleration 으로 고르면 점진 감속(아래 post_dash_deceleration 사용)으로 돌아간다. 코드 수정 필요 없음
+@export var post_dash_velocity_policy: PostDashVelocityPolicy = PostDashVelocityPolicy.IMMEDIATE_CAP
+## 점진 감속(GRADUAL_DECELERATION)일 때만 쓰는 감속도 (px/s²) — PostDashDeceleration
 @export var post_dash_deceleration: float = 2400.0

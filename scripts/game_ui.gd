@@ -32,5 +32,15 @@ func show_game_over(reason: String, distance: float) -> void:
 	_game_over_label.visible = true
 
 
+## 코스 클리어 표시 (Phase 4). 게임 오버와 같은 자리를 초록색으로 쓴다
+func show_clear(seconds: float, distance: float, kills: int) -> void:
+	_game_over_label.text = "COURSE CLEAR
+time  %.1f s    distance  %.0f px    kills  %d
+
+R  play again" % [seconds, distance, kills]
+	_game_over_label.add_theme_color_override("font_color", Color(0.45, 1.0, 0.55))
+	_game_over_label.visible = true
+
+
 func is_game_over_visible() -> bool:
 	return _game_over_label.visible

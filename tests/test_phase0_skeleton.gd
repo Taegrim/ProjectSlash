@@ -16,20 +16,22 @@ func test_main_scene_has_core_nodes() -> void:
 
 
 func test_course_follows_design_pattern() -> void:
-	# §10.1 [확정] 건물 → 건물 → 적 → 적 → 건물 (진행 방향 +X 순서)
+	# §10.1 [확정] 건물 → 건물 → 적 → 적 → 건물 (진행 방향 +X 순서). 그 뒤 위험 구간의 공중 구조물(Phase 4)은 'A' 로 센다
 	var course: TestCourse = add_node(COURSE_SCENE.instantiate())
 	await physics_frames(1)
 	var items: Array = []
 	for building in course.get_buildings():
-		items.append([building.global_position.x, "B"])
+		items.append([building.global_position.x, "A" if building.aerial else "B"])
 	for enemy in course.get_enemies():
 		items.append([enemy.global_position.x, "E"])
 	items.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
 	var pattern := "".join(items.map(func(item: Array) -> String: return item[1]))
-	check_eq(pattern, "BBEEB", "배치 순서 (B = 건물, E = 적)")
+	check_eq(pattern.replace("A", ""), "BBEEB", "핵심 배치 순서 (B = 솟은 건물, E = 적)")
+	check(pattern.begins_with("BBEEB"), "공중 구조물은 핵심 배치 뒤 (위험 구간) (%s)" % pattern)
 	check(course.get_hazards().size() >= 1, "위험 구간이 1개 이상 있어야 함 (§10.2-6)")
+	var rising := course.get_buildings().filter(func(b: Building) -> bool: return not b.aerial)
 	for hazard in course.get_hazards():
-		check(hazard.global_position.x > course.get_buildings()[-1].global_position.x, "위험 구간은 마지막 건물 뒤")
+		check(hazard.global_position.x > rising[-1].global_position.x, "위험 구간은 마지막 솟은 건물 뒤")
 
 
 func test_fall_limit_is_below_everything_reachable() -> void:
