@@ -51,6 +51,7 @@ func _run() -> void:
 				if main.game_over:
 					break
 			distances.append(int(main.get_distance()))
+			bot.free()  # 트리에 넣지 않은 노드라 직접 지운다
 			main.queue_free()
 			await process_frame
 		distances.sort()

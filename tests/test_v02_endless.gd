@@ -90,6 +90,7 @@ func _run_bot(seed: int, frames: int) -> Dictionary:
 		if main.game_over:
 			break
 	var result := {"distance": main.get_distance(), "reason": main.game_over_reason if main.game_over else ""}
+	bot.free()  # 트리에 넣지 않은 노드라 직접 지운다 (안 지우면 종료 때 '누수' 경고)
 	main.queue_free()
 	await physics_frames(1)
 	return result
