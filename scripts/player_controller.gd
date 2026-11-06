@@ -10,7 +10,8 @@
 ## 마우스 조준은 와이어에만 쓰고, 돌진은 조준 없이 자동 타기팅이다 (§4 [확정]).
 ##
 ## Phase 1: AIRBORNE 이동(자동 전진·중력·속도 상한), 충돌 감속, 사망.
-## Phase 2: GRAPPLING (와이어 스윙 — 속도 계산은 GrappleController, 이동·충돌은 여기서). DASHING 은 Phase 3.
+## Phase 2: GRAPPLING (와이어 스윙 — 속도 계산은 GrappleController, 이동·충돌은 여기서).
+## Phase 3: DASHING (돌진 베기 — 속도·종료 판정은 DashController, 이동·충돌은 여기서).
 class_name PlayerController
 extends CharacterBody2D
 
@@ -47,6 +48,8 @@ var bump_count := 0
 var death_reason := ""
 ## 조준점 연결 가능 여부 미리보기 (GrappleController.evaluate 결과)
 var aim_preview := {}
+## 지금 우클릭하면 돌진할 대상 {enemy, reason} (표시용)
+var dash_preview := {}
 ## 캡처·테스트용: 유한한 값이면 마우스 대신 이 지점을 조준점으로 쓴다
 var debug_aim_override := Vector2.INF
 
@@ -55,6 +58,7 @@ var _contacts := {}
 ## 체공 상한을 넘어도 되는 남은 여유 (해제·돌진 직후 관성 보존용, 시간이 지나며 0 으로 줄어든다)
 var _extra_horizontal := 0.0
 var _extra_total := 0.0
+var _extra_deceleration := 900.0
 
 @onready var grapple: GrappleController = $GrappleController
 @onready var dash: DashController = $DashController
@@ -68,6 +72,7 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	aim_point = debug_aim_override if debug_aim_override.is_finite() else get_global_mouse_position()
 	aim_preview = grapple.evaluate(aim_point) if state == State.AIRBORNE else {}
+	dash_preview = dash.find_target() if state in [State.AIRBORNE, State.GRAPPLING] else {}
 	match state:
 		State.AIRBORNE:
 			_step_airborne(delta)
@@ -77,10 +82,15 @@ func _physics_process(delta: float) -> void:
 				move_and_slide()
 				_apply_contact_penalty()
 				grapple.after_move(delta)
+		State.DASHING:
+			dash.apply_dash(delta)
+			if state == State.DASHING:
+				move_and_slide()
+				dash.after_move(delta)
 		State.DEAD:
 			pass  # §9.1 DEAD: 물리 액션 중지
 		_:
-			pass  # DASHING (Phase 3)
+			pass
 	queue_redraw()
 
 
@@ -101,7 +111,7 @@ func _step_airborne(delta: float) -> void:
 	velocity.y += movement.gravity * delta
 	var rate := movement.air_acceleration if velocity.x < movement.auto_forward_speed else movement.air_deceleration
 	velocity.x = move_toward(velocity.x, movement.auto_forward_speed, rate * delta)
-	var decay := movement.over_cap_deceleration * delta
+	var decay := _extra_deceleration * delta
 	_extra_horizontal = maxf(0.0, _extra_horizontal - decay)
 	_extra_total = maxf(0.0, _extra_total - decay)
 	velocity = cap_speed(velocity, movement, _extra_horizontal, _extra_total)
@@ -110,10 +120,18 @@ func _step_airborne(delta: float) -> void:
 
 
 ## 지금 속도가 체공 상한을 넘는 몫을 '여유'로 기억한다 (와이어 해제·돌진 종료 때 호출).
-## 이후 체공 상한은 이 여유만큼 높게 시작해 over_cap_deceleration 으로 원래 상한까지 내려온다.
-func carry_over_cap() -> void:
+## 이후 체공 상한은 이 여유만큼 높게 시작해 deceleration(기본 over_cap_deceleration)으로 원래 상한까지 내려온다.
+func carry_over_cap(deceleration := -1.0) -> void:
 	_extra_horizontal = maxf(0.0, absf(velocity.x) - movement.max_air_horizontal_speed)
 	_extra_total = maxf(0.0, velocity.length() - movement.max_air_total_speed)
+	_extra_deceleration = deceleration if deceleration > 0.0 else movement.over_cap_deceleration
+
+
+## 체공 상한을 즉시 적용한다 (돌진 종료 A안 IMMEDIATE_CAP, §7.3).
+func apply_speed_cap_now() -> void:
+	_extra_horizontal = 0.0
+	_extra_total = 0.0
+	velocity = cap_speed(velocity, movement)
 
 
 ## 일반 체공 속도 상한 (§5.1 [확정] 최고 속도 제한, §5.2 [중요] 수평/전체 기준을 설정으로 선택).
@@ -159,6 +177,7 @@ func die(reason: String) -> void:
 	if state == State.DEAD:
 		return
 	grapple.force_release("death")  # §6.5 플레이어 사망: 와이어 즉시 종료
+	dash.cancel("death")
 	death_reason = reason
 	velocity = Vector2.ZERO
 	set_state(State.DEAD)
@@ -191,6 +210,12 @@ func _draw() -> void:
 		draw_arc(aim, 8.0, 0.0, TAU, 18, aim_color, 2.0)
 		if valid:
 			draw_circle(to_local(aim_preview.point), 4.0, aim_color)  # 실제로 걸릴 지점
+	# 돌진 타깃 미리보기: 지금 우클릭하면 벨 적 (§7.2 자동 선택 결과를 보여 준다)
+	var target: Enemy = dash_preview.get("enemy")
+	if target != null:
+		draw_arc(to_local(target.global_position), target.radius + 8.0, 0.0, TAU, 24, Color(1.0, 0.45, 0.35, 0.9), 3.0)
+	if state == State.DASHING and is_instance_valid(dash.target):
+		draw_line(Vector2.ZERO, to_local(dash.end_point), Color(1.0, 0.45, 0.35, 0.6), 2.0)
 	if not debug_draw:
 		return
 	draw_line(Vector2.ZERO, aim, Color(1, 1, 1, 0.15), 1.0)  # 조준선

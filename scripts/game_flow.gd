@@ -118,7 +118,7 @@ func _debug_text() -> String:
 		"BUMPS  %d   (contact = slow, not death)" % player.bump_count,
 		"WIRE   %s" % player.grapple.describe(),
 		"AIM    %s" % ("attachable" if player.aim_preview.get("ok", false) else player.aim_preview.get("reason", "-")),
-		"DASH   %s" % player.dash.last_request,
+		"DASH   %s" % player.dash.describe(),
 		"FALL   y > %.0f = game over" % course.fall_limit_y,
 		"CAM    y %.0f  (lowest %.0f)%s" % [camera.global_position.y, camera.get_lowest_y(),
 				"  overview" if camera.overview else ""],

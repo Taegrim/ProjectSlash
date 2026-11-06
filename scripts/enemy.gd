@@ -1,6 +1,6 @@
 ## 적 — 돌진 베기 대상, 와이어 불가 (기획서 §7, §8 [확정]). v0.1 은 공격하지 않는 정지형 표적.
 ## 돌진이 아닌 몸 접촉은 일반 장애물처럼 감속한다 (§8 [MVP 제안]).
-## 타기팅·처치 로직은 Phase 3. 지금은 살아 있음 여부와 처치 함수만 있다.
+## 돌진 타기팅은 DashController 가 'enemies' 그룹에서 찾는다 (Phase 3).
 @tool
 class_name Enemy
 extends StaticBody2D
@@ -28,13 +28,14 @@ var _collider: CollisionShape2D
 func _ready() -> void:
 	if Engine.is_editor_hint():
 		return
+	add_to_group("enemies")
 	_collider = CollisionShape2D.new()
 	_collider.shape = CircleShape2D.new()
 	add_child(_collider)
 	_sync_collider()
 
 
-## 돌진이 적중했을 때 호출한다 (Phase 3). 사라지고 충돌도 끈다.
+## 돌진이 적중했을 때 호출한다. 사라지고 충돌도 끈다 (§7.4).
 func kill() -> void:
 	if not alive:
 		return
@@ -43,6 +44,14 @@ func kill() -> void:
 	if _collider:
 		_collider.set_deferred("disabled", true)
 	killed.emit(self)
+
+
+## 되살린다 (실험실 씬의 처음으로 돌아가기용. 게임 재시작은 씬을 다시 불러온다)
+func revive() -> void:
+	alive = true
+	show()
+	if _collider:
+		_collider.set_deferred("disabled", false)
 
 
 func _sync_collider() -> void:

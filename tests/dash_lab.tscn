@@ -1,0 +1,51 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://tests/swing_lab.gd" id="1_lab"]
+[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="2_player"]
+[ext_resource type="PackedScene" path="res://scenes/building.tscn" id="3_building"]
+[ext_resource type="PackedScene" path="res://scenes/enemy.tscn" id="4_enemy"]
+
+[node name="DashLab" type="Node2D"]
+script = ExtResource("1_lab")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(800, 400)
+zoom = Vector2(0.8, 0.8)
+
+[node name="Behind" parent="." instance=ExtResource("4_enemy")]
+position = Vector2(40, 330)
+debug_label = "behind (ignored)"
+
+[node name="First" parent="." instance=ExtResource("4_enemy")]
+position = Vector2(430, 420)
+debug_label = "1"
+
+[node name="Second" parent="." instance=ExtResource("4_enemy")]
+position = Vector2(760, 320)
+debug_label = "2"
+
+[node name="Wall" parent="." instance=ExtResource("3_building")]
+position = Vector2(1000, 260)
+size = Vector2(90, 700)
+attach_band_depth = 80.0
+debug_label = "wall"
+
+[node name="Hidden" parent="." instance=ExtResource("4_enemy")]
+position = Vector2(1260, 360)
+debug_label = "behind wall"
+
+[node name="Trail" type="Line2D" parent="."]
+width = 3.0
+default_color = Color(0.4, 1, 1, 0.45)
+
+[node name="Player" parent="." instance=ExtResource("2_player")]
+position = Vector2(120, 300)
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="Info" type="Label" parent="UI"]
+offset_left = 16.0
+offset_top = 12.0
+offset_right = 1264.0
+offset_bottom = 48.0
+theme_override_font_sizes/font_size = 20

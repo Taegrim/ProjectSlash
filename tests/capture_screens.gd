@@ -9,7 +9,8 @@
 ##   --press=액션@프레임,...      해당 프레임에 입력 액션을 누른다 (예: restart@150, toggle_overview@200)
 ##   --record=시작-끝[:간격]      구간 프레임을 <out>/frames/f_0000.png … 로 저장 (GIF 재료, 간격 기본 2)
 ##   --call=명령@프레임;...       플레이어 와이어 조작 (구분자는 ';'):
-##                                aim:x,y (조준점 고정 — 마우스 대신), attach (조준점으로 연결), release (해제)
+##                                aim:x,y (조준점 고정 — 마우스 대신), attach (조준점으로 연결), release (해제),
+##                                dash (우클릭과 같음: 자동 타기팅 돌진)
 ##                                예) --call="aim:626,430@40;attach@53;release@83"
 ##   --overview                   마지막에 코스 전체 보기를 켜고 <out>/overview.png 저장
 extends SceneTree
@@ -110,12 +111,15 @@ func _call_player(command: String) -> void:
 		player.get("grapple").call("request_attach", player.get("debug_aim_override"))
 	elif command == "release":
 		player.get("grapple").call("request_release")
+	elif command == "dash":
+		player.get("dash").call("request_dash")
 	else:
 		printerr("알 수 없는 명령: " + command)
 		return
 	# 헤드리스 탐색 결과와 맞춰 보기 위해 명령 시점의 위치·결과를 남긴다
+	var result_of: Object = player.get("dash") if command == "dash" else player.get("grapple")
 	print("call %s at pos %s -> %s" % [command, Vector2(player.get("global_position")).round(),
-			player.get("grapple").get("last_request")])
+			result_of.get("last_request")])
 
 
 func _press(action: String) -> void:
