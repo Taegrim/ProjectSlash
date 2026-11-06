@@ -75,7 +75,7 @@ Claude가 작업 결과를 스스로 확인하기 위한 장치다. 세부 사�
 |---|---|
 | `python tools/validate.py` | 임포트(class_name 캐시 갱신) → 모든 `.gd/.tscn/.tres` 로드 검사 → `tests/test_*.gd` 실행. `--smoke [프레임]`으로 메인 씬 헤드리스 실행 추가, `--filter`로 일부 테스트만 |
 | `tests/run_tests.gd`, `tests/test_case.gd` | 플러그인 없는 헤드리스 테스트 러너/기본 클래스. 물리·상태 전환 회귀 테스트는 `tests/test_*.gd`로 추가 |
-| `tests/capture_screens.gd` | 창을 잠깐 띄워 시작 화면·코스 전체 보기 스크린샷 저장 (리뷰 페이지용): `python tools/godot_cli.py --path . -s res://tests/capture_screens.gd -- --out=<폴더>` |
+| `tests/capture_screens.gd` | 창을 잠깐 띄워 스크린샷·GIF용 연속 프레임 저장 (리뷰 페이지용). 프레임별 입력(`--press`)·와이어 조작(`--call`) 지정 가능: `python tools/godot_cli.py --path . --fixed-fps 60 -s res://tests/capture_screens.gd -- --out=<폴더>` (옵션은 파일 머리말) |
 | `.claude/hooks/godot_check.py` | (자동) `.gd/.tscn/.tres` 수정 직후 해당 파일 파스/로드 검사, 오류 시 즉시 피드백 |
 | `.claude/hooks/guard_confirmed_rules.py` | (자동) 기획서의 `[확정]` 줄·15절 수정/삭제와 새 `[확정]` 추가를 차단 |
 
@@ -118,7 +118,8 @@ compact·/clear 뒤에도 작업을 잇기 위해 **저장소 한 단계 위 폴
 - 세션 시작·compact·clear 직후 `.claude/hooks/handoff_context.py`(SessionStart 훅)가 그 내용을 컨텍스트에 자동으로 넣는다. 주입된 내용이 없으면 직접 읽는다.
 - 재개할 때는 HANDOFF를 기준으로 상태를 파악하되, '진행 중' 항목은 `git status`/`git log`와 실제 파일로 대조한 뒤 이어서 한다. 문서와 실제가 다르면 실제를 따르고 문서를 고친다.
 - 작업 종료 루틴마다 갱신하고, 긴 작업 도중에도 큰 단계가 끝나거나 중요한 결정·발견이 생기면 바로 고친다.
-- **컨텍스트 78%**: 감시 훅(`.claude/hooks/context_watch.py`)이 갱신을 지시한다. 받으면 즉시 '진행 중'을 compact 뒤 이어갈 수 있을 만큼 구체적으로 갱신하고, 현재 단계만 마무리한 뒤 한 번 더 갱신하고 `python .claude/hooks/context_watch.py ready`를 실행한다. 새 큰 단계는 시작하지 않는다.
+- **컨텍스트 78%**: 감시 훅(`.claude/hooks/context_watch.py`)이 갱신을 지시한다. 받으면 즉시 '진행 중'을 compact 뒤 이어갈 수 있을 만큼 구체적으로 갱신하고, 현재 단계만 마무리한 뒤 한 번 더 갱신하고 `python .claude/hooks/context_watch.py ready`를 실행한 뒤, 멈추지 말고 이어서 진행한다 (다음 단계 계획을 먼저 '진행 중'에 적는다). 78% 이상에서 새 요청을 받으면 시작 전에 요청·계획을 '진행 중'에 적고 진행한다.
+- 훅이나 Claude가 `/compact`를 직접 실행하는 방법은 없다(공식 문서). 그래서 사용자에게 수동 compact를 요청하지 않고, autocompact 뒤 SessionStart 훅의 HANDOFF 주입으로 이어서 작업한다.
 - **autocompact(약 80%)**는 ready 표시가 있거나 응답이 끝날 때까지 보류되고, 88%에서는 강제로 진행된다. 수동 `/compact`는 막지 않는다. 시점은 `.claude/settings.local.json`의 `CLAUDE_CODE_AUTO_COMPACT_WINDOW`(833000)로 정한다.
 - 사용자 결정·선호는 '다시 묻지 말 것' 절에 남긴다. 분량은 8,000자 이내로 유지하고 코드·로그는 경로로 가리킨다.
 

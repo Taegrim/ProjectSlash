@@ -9,6 +9,10 @@ CLAUDE_CODE_AUTO_COMPACT_WINDOW 로 약 80% 에 오도록 설정)
   ready 표시: 단계를 끝낸 Claude 가 `python .claude/hooks/context_watch.py ready` 실행,
               또는 78% 이상에서 응답이 끝나면(Stop = 자연스러운 단계 경계) 자동으로 표시
   수동 /compact 는 막지 않는다 (PreCompact matcher 를 auto 로만 등록).
+  훅이나 Claude 가 /compact 를 직접 실행하는 방법은 Claude Code 에 없다 (공식 문서 확인, 2026-11-06). 그래서 '멈추고 사용자에게
+  /compact 요청' 대신 'HANDOFF 를 최신으로 두고 계속 작업 → 80% 에서 autocompact → SessionStart(compact) 훅이 HANDOFF 주입 →
+  이어서 작업' 흐름을 쓴다. 78% 이상에서 새 요청이 오면 시작 전에 요청·계획을 HANDOFF 에 적게 한다.
+  보류(exit 2)된 autocompact 가 다음 호출에서 다시 시도되는지는 문서에 없다 (88% 강제 허용으로 대비).
 
 사용량: transcript_path(JSONL)의 마지막 메인 대화 assistant 응답 usage 합계 (+ 방금 도구 결과 추정치).
 기록 파일은 비동기로 쓰여 한두 메시지 늦을 수 있으므로 78~80% 사이 여유로 흡수한다.
@@ -111,8 +115,9 @@ def on_progress(event: str, pct: float, used: int, state: dict) -> None:
         state["stage"] = 3
         inject(event, (
             f"[컨텍스트 {pct:.1f}% — autocompact 보류 중] 현재 단계가 끝날 때까지 compact 를 미뤄 두었다 "
-            f"({HARD_CAP_PCT:.0f}% 에서는 강제로 진행). 새 단계는 시작하지 말고 지금 단계만 마친 뒤, "
-            f"HANDOFF.md 를 최신으로 고치고 `{READY_COMMAND}` 를 실행하라. 그러면 다음 요청에서 compact 된다."))
+            f"({HARD_CAP_PCT:.0f}% 에서는 강제로 진행). 지금 단계만 마친 뒤 HANDOFF.md 를 최신으로 고치고 "
+            f"`{READY_COMMAND}` 를 실행하라. 그러면 autocompact 가 진행되고 HANDOFF 가 자동 주입되어 이어서 작업한다. "
+            "사용자에게 수동 /compact 를 요청하지 말고 작업을 멈추지 않는다."))
     elif pct >= URGENT_PCT and stage < 2 and handoff_mtime() <= state.get("reminded_at", 0):
         state["stage"] = 2
         inject(event, (
@@ -123,8 +128,10 @@ def on_progress(event: str, pct: float, used: int, state: dict) -> None:
         inject(event, (
             f"[컨텍스트 {pct:.1f}% — 곧 autocompact({TRIGGER_PCT:.0f}%), 여유 약 {left:,} 토큰] 지금 바로 HANDOFF.md 를 "
             "갱신하라: '1. 지금 상태 > 진행 중'에 현재 작업, 끝낸 하위 단계, 바로 다음 하위 단계, 관련 파일, 미확인 사항을 "
-            "compact 뒤 이어서 할 수 있을 만큼 구체적으로 적는다. 그 뒤 현재 단계만 마무리하고 새 큰 단계는 시작하지 않는다. "
-            f"단계를 마치면 HANDOFF.md 를 한 번 더 고치고 `{READY_COMMAND}` 를 실행해 compact 를 허용한다."))
+            "compact 뒤 이어서 할 수 있을 만큼 구체적으로 적는다. 현재 단계를 마치면 HANDOFF.md 를 한 번 더 고치고 "
+            f"`{READY_COMMAND}` 를 실행해 compact 를 허용한 뒤, 멈추지 말고 다음 단계를 이어서 진행한다 (다음 단계를 "
+            "시작하기 전에 그 계획을 '진행 중'에 먼저 적는다). autocompact 는 자동으로 일어나고 HANDOFF 가 자동 주입되므로 "
+            "사용자에게 수동 /compact 를 요청하지 않는다."))
 
 
 def on_precompact(payload: dict, pct: float) -> int:
@@ -142,7 +149,7 @@ def on_precompact(payload: dict, pct: float) -> int:
 def main() -> int:
     if len(sys.argv) > 1 and sys.argv[1] == "ready":
         READY_MARKER.write_text(str(time.time()), encoding="utf-8")
-        sys.stdout.buffer.write("compact 허용 표시함 — 다음 요청에서 autocompact 가 진행됩니다.\n".encode("utf-8"))
+        sys.stdout.buffer.write("compact 허용 표시함 — 임계를 넘으면 autocompact 후 HANDOFF 가 주입되어 이어집니다. 멈추지 말고 계속 진행하세요.\n".encode("utf-8"))
         return 0
     try:
         payload = json.loads(sys.stdin.buffer.read().decode("utf-8") or "{}")
@@ -169,6 +176,12 @@ def main() -> int:
     if event == "Stop":
         if pct >= SAVE_PCT:  # 응답이 끝남 = 단계 경계 → 다음 요청에서 compact 허용
             READY_MARKER.write_text(str(time.time()), encoding="utf-8")
+    elif event == "UserPromptSubmit" and pct >= SAVE_PCT:
+        # 높은 사용량에서 새 요청: 멈추거나 /compact 를 요청하지 말고, 계획을 먼저 HANDOFF 에 적은 뒤 진행
+        inject(event, (
+            f"[컨텍스트 {pct:.1f}% — 이번 작업 중 autocompact({TRIGGER_PCT:.0f}%) 예상] 작업을 시작하기 전에 HANDOFF.md "
+            "'1. 지금 상태 > 진행 중'에 이번 요청(사용자 의견 요지)과 단계별 계획을 먼저 적고 바로 진행하라. "
+            "compact 가 중간에 일어나도 HANDOFF 가 자동 주입되어 이어진다. 사용자에게 /compact 를 요청하지 않는다."))
     elif event in ("PostToolUse", "UserPromptSubmit"):
         on_progress(event, pct, used, state)
 
